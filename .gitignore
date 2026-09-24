@@ -1,0 +1,40 @@
+# Сырые захваты и отчёты — содержат данные всех BT-устройств и ключи сопряжения
+protocol/raw/
+*.btsnoop
+*.cfa
+bugreport*.zip
+!protocol/captures/*.btsnoop
+
+# Декомпилированные APK
+decompiled/
+*.apk
+
+# Локальные настройки и данные
+*.local.*
+.env
+.env.*
+*.db
+*.sqlite
+
+# Python
+__pycache__/
+.venv/
+*.pyc
+
+# Node / web
+node_modules/
+dist/
+
+# Android / Gradle
+.gradle/
+build/
+local.properties
+*.keystore
+*.jks
+android/**/captures/
+.idea/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
