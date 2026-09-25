@@ -20,7 +20,8 @@ powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 
 | Метод | Путь | Что |
 |---|---|---|
-| GET | `/` | веб-интерфейс |
+| GET | `/` | главная: меню с состоянием дорожки, станций, сети и хаба |
+| GET | `/treadmill/` | дорожка (вкладки открываются ссылкой `#programs`, `#history`, `#awards`, `#hub`) |
 | GET | `/api/state` | снимок: `treadmill`, `session`, `hub` |
 | WS | `/ws/live` | тот же снимок при каждом изменении (~1 Гц) |
 | POST | `/api/control` | `{"action": "start\|stop\|pause\|speed\|incline\|speedDelta\|inclineDelta\|program\|programEnd", "value": 5.0, "profileId": "…", "programId": "P3", "level": 4, "minutes": 30}` |
@@ -51,3 +52,5 @@ powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 **Агентам:** `/api/control` двигает ленту — только с подтверждением владельца (см. `CLAUDE.md`). Для проверок без риска — `backend: "sim"` и перезапуск сервиса.
 
 Сообщения в Telegram идут через очередь (`telegram-outbox.json`): без интернета они ждут и уходят позже с пометкой «отправлено с задержкой».
+
+Иконка приложения рисуется скриптом `tools/icons/make_icons.py` (SVG-фавикон и PNG 32/180/192/512).

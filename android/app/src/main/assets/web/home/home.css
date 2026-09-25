@@ -1,0 +1,16 @@
+body.home { padding-bottom: 32px; max-width: 960px; }
+.logo { width: 30px; height: 30px; }
+.pageTitle { font-size: 20px; }
+.tiles { display: grid; gap: 12px; }
+@media (min-width: 700px) { .tiles { grid-template-columns: 1fr 1fr; } }
+.tile { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; color: var(--text); text-decoration: none; min-height: 132px; }
+.tile:active { transform: scale(.98); background: #232b34; }
+.tile.bad { border-color: #6b2a2d; box-shadow: 0 0 22px rgba(229, 72, 77, .22); }
+.tile.live { border-color: #235c3d; box-shadow: 0 0 22px rgba(47, 191, 113, .18); }
+.tHead { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.tHead b { font-size: 21px; margin-right: auto; }
+.tIcon { font-size: 28px; }
+.tBody { display: grid; gap: 4px; color: var(--muted); font-size: 15px; }
+.tBody .big { color: var(--text); font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tBody .row { display: flex; justify-content: space-between; gap: 8px; }
+.tBody .row b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }

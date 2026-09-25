@@ -3,7 +3,11 @@
 // Использует общие функции из app.js: $, me, control, toast, fmtTime.
 
 // --- Вкладки -----------------------------------------------------------------------
+const TAB_TITLES = { workout: "Тренировка", programs: "Программы", history: "История", awards: "Награды", hub: "Хаб" };
 function showTab(name) {
+  if (!TAB_TITLES[name]) name = "workout";
+  document.title = `${TAB_TITLES[name]} · Дорожка`;
+  history.replaceState(null, "", name === "workout" ? location.pathname : "#" + name);
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("hidden", t.id !== "tab-" + name));
   if (name === "programs") loadPrograms();
@@ -13,6 +17,7 @@ function showTab(name) {
   window.scrollTo(0, 0);
 }
 document.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));
+window.addEventListener("hashchange", () => showTab(location.hash.slice(1)));
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
@@ -480,3 +485,6 @@ window.onProfileChanged = () => {
   const active = document.querySelector(".tabs button.active");
   if (active && active.dataset.tab !== "workout") showTab(active.dataset.tab);
 };
+
+// Ссылка вида /treadmill/#hub открывает нужную вкладку (все скрипты уже загружены)
+window.addEventListener("load", () => { if (location.hash) showTab(location.hash.slice(1)); });

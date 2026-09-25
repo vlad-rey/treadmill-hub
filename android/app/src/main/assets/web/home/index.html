@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101418">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="description" content="Домашний хаб: беговая дорожка, станции Fossibot, сеть и состояние сервера">
+  <title>Домашний хаб</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/home/home.css">
+</head>
+<body class="home">
+  <header>
+    <img class="logo" src="/static/favicon.svg" alt="">
+    <b class="pageTitle">Домашний хаб</b>
+    <span class="grow"></span>
+    <span id="clock" class="pill"></span>
+  </header>
+
+  <main class="tiles">
+    <a class="tile" id="tTreadmill" href="/treadmill/">
+      <div class="tHead"><span class="tIcon">🏃</span><b>Дорожка</b><span class="pill" id="trState">…</span></div>
+      <div class="tBody" id="trBody"></div>
+    </a>
+    <a class="tile" id="tPower" href="/power/">
+      <div class="tHead"><span class="tIcon">⚡</span><b>Станции</b><span class="pill" id="pwState">…</span></div>
+      <div class="tBody" id="pwBody"></div>
+    </a>
+    <a class="tile" id="tNet" href="/treadmill/#hub">
+      <div class="tHead"><span class="tIcon">🌐</span><b>Сеть</b><span class="pill" id="netState">…</span></div>
+      <div class="tBody" id="netBody"></div>
+    </a>
+    <a class="tile" id="tHub" href="/treadmill/#hub">
+      <div class="tHead"><span class="tIcon">🖥️</span><b>Хаб</b><span class="pill" id="hubState">…</span></div>
+      <div class="tBody" id="hubBody"></div>
+    </a>
+  </main>
+
+  <script src="/static/home/home.js"></script>
+</body>
+</html>

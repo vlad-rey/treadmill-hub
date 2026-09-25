@@ -20,6 +20,7 @@ import io.ktor.server.engine.ApplicationEngine
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.request.receiveText
 import io.ktor.server.response.respondBytes
+import io.ktor.server.response.respondRedirect
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -47,7 +48,11 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
     private val engine: ApplicationEngine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
         install(WebSockets) { pingPeriodMillis = 15_000 }
         routing {
-            get("/") { call.respondAsset("index.html") }
+            // Главная — меню; дорожка — /treadmill/, станции — /power/
+            get("/") { call.respondAsset("home/index.html") }
+            get("/treadmill") { call.respondRedirect("/treadmill/") }
+            get("/treadmill/") { call.respondAsset("index.html") }
+            get("/favicon.ico") { call.respondAsset("favicon-32.png") }
             // Service worker должен отдаваться из корня, чтобы управлять всем приложением
             get("/sw.js") { call.respondAsset("sw.js") }
             get("/static/{path...}") {
