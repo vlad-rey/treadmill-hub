@@ -34,17 +34,14 @@
       </div>
       <div class="row presets" id="speedPresets"></div>
       <div class="row">
-        <span class="rowLabel">Наклон</span>
-        <button data-act="inclineDelta" data-v="-1">−1 %</button>
-        <button data-act="inclineDelta" data-v="1">+1 %</button>
+        <span class="rowLabel">Наклон, %</span>
         <button data-act="incline" data-v="0">0</button>
         <button data-act="incline" data-v="5">5</button>
         <button data-act="incline" data-v="10">10</button>
         <button data-act="incline" data-v="15">15</button>
       </div>
-      <div class="row main">
-        <button class="go" data-act="start">Старт</button>
-        <button class="pause" data-act="pause">Пауза</button>
+      <div class="row main hidden" id="pauseRow">
+        <button class="pause" id="pauseBtn" data-act="pause">Пауза</button>
       </div>
     </section>
 
@@ -54,7 +51,8 @@
     </details>
   </main>
 
-  <button id="stop" class="stop" data-act="stop">СТОП</button>
+  <!-- Одна большая кнопка: СТАРТ, когда лента стоит, СТОП — когда запущена -->
+  <button id="mainBtn" class="mainBtn start" data-act="start">СТАРТ</button>
 
   <div id="countdown" class="countdown hidden"></div>
   <div id="toast" class="toast hidden"></div>

@@ -54,6 +54,11 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
     private val pending = ConcurrentHashMap<Int, CompletableDeferred<Ftms.CpResponse>>()
     @Volatile private var hasControl = false
 
+    // Калории приходят из двух источников вперемешку; без разделения значение мигает (0 ↔ нет данных)
+    @Volatile private var kcalFtms: Double? = null
+    @Volatile private var kcalFitShow: Double? = null
+    private val kcal get() = kcalFitShow ?: kcalFtms
+
     override fun start(scope: CoroutineScope) {
         job = scope.launch { connectLoop() }
     }
@@ -187,6 +192,7 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
     private fun onTreadmillData(b: ByteArray) {
         emit("rx", Ftms.TREADMILL_DATA, b)
         val d = Ftms.parseTreadmillData(b) ?: return
+        d.kcal?.let { kcalFtms = it.toDouble() }
         _state.update { s ->
             s.copy(
                 speedKmh = d.speedKmh ?: s.speedKmh,
@@ -194,8 +200,7 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
                 distanceM = d.distanceM ?: s.distanceM,
                 elapsedS = d.elapsedS ?: s.elapsedS,
                 heartRate = if (d.speedKmh != null) d.heartRate else s.heartRate,
-                // FTMS даёт целые ккал; если есть точное значение FitShow — оставляем его
-                kcal = if (s.kcal != null && d.kcal != null && s.kcal >= d.kcal) s.kcal else d.kcal?.toDouble() ?: s.kcal,
+                kcal = kcal,
                 updatedAtMs = System.currentTimeMillis(),
             )
         }
@@ -204,6 +209,8 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
     private fun onFitShow(b: ByteArray) {
         emit("rx", FitShow.NOTIFY, b)
         val st = FitShow.parseStatus(b) ?: return
+        // Точные калории (шаг 0,1) есть только в движении/после стопа; в ожидании — берём FTMS
+        if (st.kcal != null) kcalFitShow = st.kcal else if (st.state == 0x00) kcalFitShow = null
         _state.update { s ->
             val phase = when (st.state) {
                 0x00 -> Phase.IDLE
@@ -215,7 +222,7 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
             s.copy(
                 phase = phase,
                 countdown = st.countdown,
-                kcal = st.kcal ?: if (phase == Phase.IDLE) null else s.kcal,
+                kcal = kcal,
             )
         }
     }

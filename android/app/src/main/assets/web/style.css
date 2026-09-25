@@ -32,8 +32,10 @@ button:disabled { opacity: .4; }
 .go { background: #173a28; border-color: #235c3d; }
 .pause { background: #3a3117; border-color: #5c4d23; }
 
-.stop { position: fixed; left: 16px; right: 16px; bottom: calc(12px + env(safe-area-inset-bottom)); max-width: 688px; margin: 0 auto;
-  padding: 20px; font-size: 24px; font-weight: 800; letter-spacing: 2px; background: var(--stop); border: 0; color: #fff; border-radius: 16px; }
+.mainBtn { position: fixed; left: 16px; right: 16px; bottom: calc(12px + env(safe-area-inset-bottom)); max-width: 688px; margin: 0 auto;
+  padding: 20px; font-size: 24px; font-weight: 800; letter-spacing: 2px; border: 0; color: #fff; border-radius: 16px; }
+.mainBtn.stop { background: var(--stop); }
+.mainBtn.start { background: var(--go); }
 
 .buckets { margin-top: 16px; background: var(--card); border-radius: 14px; padding: 10px 12px; }
 .buckets summary { color: var(--muted); }
@@ -41,7 +43,10 @@ table { width: 100%; border-collapse: collapse; margin-top: 8px; font-variant-nu
 th, td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--line); }
 th { color: var(--muted); font-weight: 400; }
 
-.countdown { position: fixed; inset: 0; display: grid; place-items: center; font-size: 160px; font-weight: 800; background: rgba(16, 20, 24, .85); }
+/* Отсчёт не должен перекрывать и перехватывать нажатие на СТОП */
+.countdown { position: fixed; inset: 0; display: grid; place-items: center; font-size: 160px; font-weight: 800; background: rgba(16, 20, 24, .85); pointer-events: none; z-index: 5; }
+.mainBtn { z-index: 10; }
+.toast { z-index: 11; }
 .toast { position: fixed; left: 16px; right: 16px; bottom: 110px; max-width: 688px; margin: 0 auto; background: #3b1a1c; color: #ffd0d2; padding: 12px 14px; border-radius: 12px; }
 .hidden { display: none; }
 

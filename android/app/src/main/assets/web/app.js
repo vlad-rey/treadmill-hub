@@ -36,9 +36,8 @@ function render(snap) {
   cd.classList.toggle("hidden", t.phase !== "COUNTDOWN");
   if (t.phase === "COUNTDOWN") cd.textContent = t.countdown ?? "";
 
-  document.querySelectorAll("[data-act]").forEach((b) => {
-    if (b.dataset.act !== "stop") b.disabled = !connected;
-  });
+  renderMainButton(t, connected);
+  document.querySelectorAll(".controls [data-act]").forEach((b) => { b.disabled = !connected; });
 
   renderPresets(hub.maxSpeedKmh);
   $("bucketRows").innerHTML = (s.buckets || [])
@@ -49,6 +48,31 @@ function render(snap) {
   $("hubInfo").textContent =
     `Хаб ${hub.version} · ${hub.backend === "sim" ? "симулятор" : "FTMS"} · батарея ${hub.batteryPct ?? "?"}%` +
     (hub.batteryTempC != null ? `, ${hub.batteryTempC.toFixed(1)} °C` : "");
+}
+
+const ACTIVE_PHASES = ["COUNTDOWN", "RUNNING", "PAUSED", "STOPPING"];
+let mainMode = null;
+let mainLockedUntil = 0;
+
+/** СТАРТ, пока лента стоит; СТОП, пока запущена. Смена режима блокирует кнопку на секунду от двойного нажатия. */
+function renderMainButton(t, connected) {
+  const active = ACTIVE_PHASES.includes(t.phase);
+  const mode = active ? "stop" : "start";
+  const btn = $("mainBtn");
+  if (mode !== mainMode) {
+    if (mainMode !== null) mainLockedUntil = Date.now() + 1000;
+    mainMode = mode;
+    btn.dataset.act = mode;
+    btn.textContent = active ? "СТОП" : "СТАРТ";
+    btn.className = "mainBtn " + mode;
+  }
+  // СТОП доступен всегда; СТАРТ — только при связи с дорожкой
+  btn.disabled = mode === "start" && !connected;
+
+  $("pauseRow").classList.toggle("hidden", !(t.phase === "RUNNING" || t.phase === "PAUSED"));
+  const paused = t.phase === "PAUSED";
+  $("pauseBtn").dataset.act = paused ? "start" : "pause";
+  $("pauseBtn").textContent = paused ? "Продолжить" : "Пауза";
 }
 
 let presetsFor = null;
@@ -85,6 +109,7 @@ async function control(action, value) {
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-act]");
   if (!b || b.disabled) return;
+  if (b.id === "mainBtn" && Date.now() < mainLockedUntil) return;
   if (navigator.vibrate) navigator.vibrate(15);
   control(b.dataset.act, b.dataset.v == null ? null : Number(b.dataset.v));
 });
