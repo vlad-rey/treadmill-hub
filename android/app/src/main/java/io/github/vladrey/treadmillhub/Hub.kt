@@ -14,6 +14,7 @@ import io.github.vladrey.treadmillhub.net.DeviceWatch
 import io.github.vladrey.treadmillhub.net.NetState
 import io.github.vladrey.treadmillhub.net.NetWatch
 import io.github.vladrey.treadmillhub.power.PowerHub
+import io.github.vladrey.treadmillhub.router.RouterWatch
 import io.github.vladrey.treadmillhub.program.BuiltinPrograms
 import io.github.vladrey.treadmillhub.program.RunState
 import io.github.vladrey.treadmillhub.program.ProgramRunner
@@ -109,7 +110,8 @@ class Hub(private val context: Context, val config: HubConfig) {
     val telegram = Telegram({ config.telegramToken }, { config.telegramChatId }, File(context.filesDir, "telegram-outbox.json"))
     val power = PowerHub(context, context.filesDir, telegram)
     val net = NetWatch(context, context.filesDir, telegram)
-    val devices = DeviceWatch(context, context.filesDir, telegram)
+    val router = RouterWatch(config, host = { net.gateway() })
+    val devices = DeviceWatch(context, context.filesDir, telegram, router)
     val bot = Bot(this, context.filesDir)
     private val programsDone = mutableListOf<String>()
     private var lastDoneRunner: ProgramRunner? = null
@@ -137,6 +139,7 @@ class Hub(private val context: Context, val config: HubConfig) {
         backend.start(scope)
         power.start(scope)
         net.start(scope)
+        router.start(scope)
         devices.start(scope)
         telegram.start(scope)
         bot.start(scope)

@@ -127,7 +127,7 @@ class NetWatch(private val context: Context, dir: File, private val telegram: Te
         Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
     }
 
-    private fun gateway(): String? = runCatching {
+    fun gateway(): String? = runCatching {
         @Suppress("DEPRECATION")
         val g = context.applicationContext.getSystemService(WifiManager::class.java).dhcpInfo.gateway
         if (g == 0) null else "${g and 0xFF}.${g shr 8 and 0xFF}.${g shr 16 and 0xFF}.${g shr 24 and 0xFF}"

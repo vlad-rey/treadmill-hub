@@ -31,6 +31,21 @@
   <main>
     <div id="netWarnings" class="list"></div>
     <div class="statsGrid hubGrid" id="netCards"></div>
+    <h3>Роутер ASUS</h3>
+    <div id="routerStatus" class="list"></div>
+    <details class="routerForm" id="routerForm">
+      <summary id="routerSummary">Логин и пароль администратора роутера</summary>
+      <form id="routerCreds" autocomplete="on">
+        <p class="muted">Хаб входит в роутер как приложение ASUS Router: берёт список клиентов и трафик, позже — замеры скорости. Пароль хранится только на хабе и обратно не показывается. Если пароль неверный, хаб больше не пробует, пока не введёте новый, — иначе роутер заблокирует вход.</p>
+        <label>Логин <input id="rtUser" name="username" autocomplete="username" value="admin" maxlength="64"></label>
+        <label>Пароль <input id="rtPass" name="password" type="password" autocomplete="current-password" maxlength="128"></label>
+        <div class="grid2">
+          <button type="button" class="btn" id="rtClear">Отключить роутер</button>
+          <button type="submit" class="btn go" id="rtSave">Подключить</button>
+        </div>
+      </form>
+    </details>
+
     <h3 id="devTitle">Устройства в сети</h3>
     <p class="muted" id="devNote"></p>
     <div id="devices" class="list"></div>

@@ -3,6 +3,8 @@ package io.github.vladrey.treadmillhub.net
 import android.content.Context
 import android.net.wifi.WifiManager
 import io.github.vladrey.treadmillhub.gamification.Telegram
+import io.github.vladrey.treadmillhub.router.RouterClient
+import io.github.vladrey.treadmillhub.router.RouterWatch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -24,6 +26,9 @@ data class NetDevice(
     val ip: String,
     val name: String? = null,
     val hostname: String? = null,
+    /** Производитель и подключение — от роутера ASUS, если он подключён. */
+    val vendor: String? = null,
+    val link: String? = null,
     val firstSeenMs: Long,
     val lastSeenMs: Long,
     /** Своё устройство: подтверждено владельцем или замечено в первые сутки наблюдения. */
@@ -80,6 +85,16 @@ class DeviceRegistry(private val file: File, private val learnMs: Long = 24 * 36
         save()
     }
 
+    /** Сведения от роутера: имя клиента, производитель, подключение. */
+    @Synchronized
+    fun setInfo(info: Map<String, RouterClient>) {
+        data = data.copy(devices = data.devices.map { d ->
+            val c = info[d.mac] ?: return@map d
+            d.copy(hostname = c.name ?: d.hostname, vendor = c.vendor ?: d.vendor, link = c.link ?: d.link)
+        })
+        save()
+    }
+
     @Synchronized
     fun patch(mac: String, p: DevicePatch): NetDevice? {
         val m = mac.lowercase()
@@ -117,8 +132,14 @@ class DeviceRegistry(private val file: File, private val learnMs: Long = 24 * 36
     }
 }
 
-/** Раз в [intervalMs] опрашивает подсеть /24 (UDP-пакет на каждый адрес заполняет ARP-таблицу) и читает ARP. */
-class DeviceWatch(private val context: Context, dir: File, private val telegram: Telegram, private val intervalMs: Long = 5 * 60_000L) {
+/**
+ * Раз в [intervalMs]: клиенты от роутера ASUS (если подключён) плюс опрос подсети /24 — UDP-пакет на каждый
+ * адрес заполняет ARP-таблицу, её и читаем.
+ */
+class DeviceWatch(
+    private val context: Context, dir: File, private val telegram: Telegram, private val router: RouterWatch,
+    private val intervalMs: Long = 5 * 60_000L,
+) {
     val registry = DeviceRegistry(File(dir, "devices.json"))
     @Volatile var lastScanMs = 0L
         private set
@@ -144,10 +165,14 @@ class DeviceWatch(private val context: Context, dir: File, private val telegram:
             for (i in 1..254) if (i != self) runCatching { s.send(DatagramPacket(p, 1, InetAddress.getByName(prefix + i), 9)) }
         }
         delay(4_000)
-        val seen = DeviceRegistry.parseArp(readArp()).filter { it.first.startsWith(prefix) }
+        val arp = DeviceRegistry.parseArp(readArp()).filter { it.first.startsWith(prefix) }
+        val fromRouter = if (System.currentTimeMillis() - router.status.lastOkMs < 2 * intervalMs) router.clients else emptyList()
+        val routerOnline = fromRouter.filter { it.online && it.ip != null }.map { it.ip!! to it.mac }
+        val seen = (routerOnline + arp).distinctBy { it.second }
         if (seen.isEmpty()) return
         val now = System.currentTimeMillis()
         val fresh = registry.seen(seen, now)
+        if (fromRouter.isNotEmpty()) registry.setInfo(fromRouter.associateBy { it.mac })
         lastScanMs = now
         // Имена от роутера (DHCP) — для новых и ещё безымянных устройств
         registry.all().filter { it.hostname == null && it.lastSeenMs == now }.take(8).forEach { d ->
@@ -156,7 +181,8 @@ class DeviceWatch(private val context: Context, dir: File, private val telegram:
         }
         for (f in fresh) {
             val d = registry.all().firstOrNull { it.mac == f.mac } ?: f
-            telegram.send(scope, "📱 Новое устройство в Wi-Fi: ${d.hostname ?: "без имени"} · ${d.ip} · MAC ${d.mac}" +
+            telegram.send(scope, "📱 Новое устройство в сети: ${d.hostname ?: "без имени"}" + (d.vendor?.let { " ($it)" } ?: "") +
+                (d.link?.let { " · $it" } ?: "") + " · ${d.ip} · MAC ${d.mac}" +
                 (if (d.randomMac) " (случайный MAC — скорее телефон или планшет)" else "") +
                 ".\nЕсли это своё — отметьте на странице «Сеть».")
         }

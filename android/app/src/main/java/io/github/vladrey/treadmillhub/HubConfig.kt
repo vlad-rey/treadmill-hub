@@ -36,6 +36,14 @@ class HubConfig(context: Context) {
         get() = prefs.getString("telegramChatId", null)
         set(v) = prefs.edit().putString("telegramChatId", v).apply()
 
+    /** Роутер ASUS: логин и пароль администратора. Хранятся только на телефоне, наружу не отдаются. */
+    var routerUser: String?
+        get() = prefs.getString("routerUser", null)
+        set(v) = prefs.edit().putString("routerUser", v).apply()
+    var routerPassword: String?
+        get() = prefs.getString("routerPassword", null)
+        set(v) = prefs.edit().putString("routerPassword", v).apply()
+
     var lastBackupMs: Long?
         get() = prefs.getLong("lastBackupMs", 0L).takeIf { it > 0 }
         set(v) = prefs.edit().putLong("lastBackupMs", v ?: 0L).apply()

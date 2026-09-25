@@ -14,3 +14,9 @@ body.page h3 { margin: 18px 2px 8px; font-size: 14px; font-weight: 500; color: v
 .dSide { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
 .btn.small { height: 34px; font-size: 14px; padding: 0 12px; border-radius: 10px; }
 @media (min-width: 900px) { #devices { display: grid; grid-template-columns: 1fr 1fr; } }
+
+.routerForm { margin-top: 8px; background: var(--card); border-radius: 14px; padding: 10px 12px; }
+.routerForm summary { color: var(--muted); cursor: pointer; }
+.routerForm label { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; color: var(--muted); font-size: 14px; }
+.routerForm input { font: inherit; font-size: 16px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+.routerForm .grid2 { margin-top: 10px; }

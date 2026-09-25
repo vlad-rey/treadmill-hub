@@ -4,6 +4,9 @@ import io.github.vladrey.treadmillhub.gamification.OutMessage
 import io.github.vladrey.treadmillhub.gamification.Telegram
 import io.github.vladrey.treadmillhub.net.NetKind
 import io.github.vladrey.treadmillhub.net.NetTracker
+import io.github.vladrey.treadmillhub.router.AsusRouter
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -55,5 +58,22 @@ class NetTest {
         assertEquals("⚡ Свет выключили", t.withDelayNote(m, t0 + 60_000))
         assertTrue(t.withDelayNote(m, t0 + 30 * 60_000).endsWith("написано в 12:00, не было связи с Telegram."))
         assertNotNull(t.withDelayNote(m, t0 + 86_400_000).let { if (it.contains("26.09 12:00")) it else null })
+    }
+
+    @Test fun asusClientListParsing() {
+        val body = """{"get_clientlist":{"maclist":["04:42:1A:00:00:01","DA:11:22:33:44:55"],"ClientAPILevel":"2",
+            "04:42:1A:00:00:01":{"name":"DESKTOP","nickName":"","ip":"192.168.50.181","vendor":"Intel","isWL":"0","isOnline":"1","rssi":"0"},
+            "DA:11:22:33:44:55":{"name":"Pixel-9","nickName":"Телефон Дианы","ip":"192.168.50.87","vendor":"","isWL":"2","isOnline":"0","rssi":"-51"}}}"""
+        val list = AsusRouter.parseClients(Json.parseToJsonElement(body).jsonObject["get_clientlist"]!!.jsonObject).sortedBy { it.mac }
+        assertEquals(2, list.size)
+        assertEquals("DESKTOP", list[0].name)
+        assertEquals("кабель", list[0].link)
+        assertNull(list[0].rssi)
+        assertTrue(list[0].online)
+        assertEquals("Телефон Дианы", list[1].name)          // имя, данное в роутере, важнее
+        assertEquals("5 ГГц", list[1].link)
+        assertEquals(-51, list[1].rssi)
+        assertNull(list[1].vendor)
+        assertEquals("da:11:22:33:44:55", list[1].mac)
     }
 }

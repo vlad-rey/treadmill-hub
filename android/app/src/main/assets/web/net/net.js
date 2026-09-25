@@ -36,6 +36,40 @@ async function loadLog() {
   } catch (_) { /* нет связи с хабом */ }
 }
 
+// --- Роутер ASUS ---------------------------------------------------------------------------
+async function loadRouter() {
+  try {
+    const r = await (await fetch("/api/router")).json();
+    let html;
+    if (!r.configured) html = `<div class="warn">Роутер не подключён — введите логин и пароль администратора ниже.</div>`;
+    else if (r.connected) html = `<div class="warn ok">✅ ${esc(r.model || "Роутер ASUS")} · клиентов ${r.clients}, в сети ${r.online}` +
+      (r.wanDownMbps != null ? ` · интернет за 5 мин: ↓ ${r.wanDownMbps} ↑ ${r.wanUpMbps} Мбит/с` : "") + ` · опрос в ${hm(r.lastOkMs)}</div>`;
+    else if (r.error) html = `<div class="warn bad">${esc(r.error)}${r.waitingForPassword ? " — введите пароль заново." : ""}</div>`;
+    else html = `<div class="warn">Подключаюсь к роутеру…</div>`;
+    $("routerStatus").innerHTML = html;
+    if (r.user && document.activeElement !== $("rtUser")) $("rtUser").value = r.user;
+    $("routerSummary").textContent = r.configured ? `Логин и пароль (сейчас: ${r.user || "admin"})` : "Логин и пароль администратора роутера";
+    if (!r.configured || r.waitingForPassword) $("routerForm").open = true;
+  } catch (_) { /* нет связи с хабом */ }
+}
+async function saveRouter(password) {
+  const r = await fetch("/api/router/credentials", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user: $("rtUser").value.trim() || "admin", password }),
+  });
+  $("rtPass").value = "";
+  if (!r.ok) { alert((await r.json()).error || "не сохранено"); return; }
+  $("routerStatus").innerHTML = `<div class="warn">${password ? "Подключаюсь к роутеру…" : "Роутер отключён."}</div>`;
+  $("routerForm").open = false;
+  setTimeout(() => { loadRouter(); loadDevices(); }, 4000);
+}
+$("routerCreds").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (!$("rtPass").value) { $("rtPass").focus(); return; }
+  saveRouter($("rtPass").value);
+});
+$("rtClear").onclick = () => { if (confirm("Отключить роутер? Хаб забудет пароль.")) saveRouter(null); };
+
 // --- Устройства в Wi-Fi: хаб опрашивает сеть раз в 5 мин; новое незнакомое — сообщение в Telegram ---
 const isRandom = (mac) => (parseInt(mac.slice(0, 2), 16) & 2) === 2;
 function seen(ms) {
@@ -56,7 +90,7 @@ async function loadDevices() {
     $("devices").innerHTML = d.devices.map((x) => `<div class="device ${x.known ? "" : "new"} ${Date.now() - x.lastSeenMs < 10 * 60e3 ? "" : "off"}">
         <div class="dMain">
           <input data-mac="${esc(x.mac)}" value="${esc(x.name || "")}" placeholder="${esc(x.hostname || "без имени")}" maxlength="40" autocomplete="off">
-          <small>${esc(x.ip)} · ${esc(x.mac)}${isRandom(x.mac) ? " · случайный MAC" : ""}${x.hostname && x.name ? " · " + esc(x.hostname) : ""}</small>
+          <small>${[x.hostname && x.name ? esc(x.hostname) : "", x.vendor ? esc(x.vendor) : "", x.link ? esc(x.link) : "", esc(x.ip), esc(x.mac) + (isRandom(x.mac) ? " (случайный)" : "")].filter(Boolean).join(" · ")}</small>
         </div>
         <div class="dSide">
           <span class="pill ${Date.now() - x.lastSeenMs < 10 * 60e3 ? "ok" : ""}">${seen(x.lastSeenMs)}</span>
@@ -94,6 +128,8 @@ async function load() {
 load();
 loadLog();
 loadDevices();
+loadRouter();
 setInterval(loadDevices, 60e3);
+setInterval(loadRouter, 30e3);
 setInterval(load, 5e3);
 setInterval(loadLog, 30e3);

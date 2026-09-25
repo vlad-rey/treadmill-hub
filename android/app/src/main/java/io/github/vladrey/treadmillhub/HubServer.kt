@@ -21,6 +21,8 @@ import io.ktor.server.cio.CIO
 import io.ktor.server.engine.ApplicationEngine
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.request.receiveText
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import io.ktor.server.response.respondBytes
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.response.respondText
@@ -41,6 +43,9 @@ private data class ProfileRef(val profileId: String? = null)
 
 @Serializable
 private data class DeliveredInput(val delivered: Boolean = true)
+
+@Serializable
+private data class RouterCredentials(val user: String = "admin", val password: String? = null)
 
 @Serializable
 private data class DevicesDto(val devices: List<NetDevice>, val learnUntilMs: Long, val lastScanMs: Long)
@@ -73,6 +78,30 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
             get("/api/power/outages") { call.respondJson(json.encodeToString(hub.power.outageList())) }
             // Сеть: сбои роутера и интернета (текущее состояние — в /api/state → hub.net)
             get("/api/net/outages") { call.respondJson(json.encodeToString(hub.net.outages())) }
+            // Роутер ASUS: пароль только принимаем, наружу не отдаём
+            get("/api/router") { call.respondJson(json.encodeToString(hub.router.status)) }
+            post("/api/router/credentials") {
+                val body = runCatching { json.decodeFromString<RouterCredentials>(call.receiveText()) }.getOrNull()
+                if (body == null || body.user.length > 64 || (body.password?.length ?: 0) > 128) {
+                    call.respondJson("""{"error":"ожидается {user, password}"}""", HttpStatusCode.BadRequest); return@post
+                }
+                hub.router.setCredentials(body.user.trim(), body.password)
+                call.respondJson(json.encodeToString(hub.router.status))
+            }
+            // Отладка интеграции с роутером: только с самого телефона (adb forward), не из Wi-Fi
+            get("/api/router/debug") {
+                if (call.request.local.remoteAddress !in setOf("127.0.0.1", "::1", "localhost")) {
+                    call.respondJson("""{"error":"только локально"}""", HttpStatusCode.Forbidden); return@get
+                }
+                val hook = call.request.queryParameters["hook"]
+                val page = call.request.queryParameters["page"]?.takeIf { it.startsWith("/") && !it.contains("..") }
+                val r = runCatching {
+                    withContext(Dispatchers.IO) {
+                        hub.router.use { rt -> if (hook != null) rt.hook(hook).toString() else if (page != null) rt.page(page).second else "нужен hook или page" }
+                    } ?: "роутер не настроен"
+                }
+                call.respondText(r.getOrElse { "ошибка: ${it.message}" })
+            }
             get("/api/net/devices") {
                 call.respondJson(json.encodeToString(DevicesDto(hub.devices.registry.all(), hub.devices.registry.learnUntilMs(), hub.devices.lastScanMs)))
             }

@@ -45,6 +45,9 @@ powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 | GET | `/api/power` | станции: `{id, name, address, state, stats}`; `stats` — итоги за `today/week/month/quarter/year/all` (`chargeSessions`, `chargedPct`, `dischargedPct`, `chargedWh`, `outputWh`, `offgridOutputWh`, `outages`, `outageS`) и `sinceDate`; цикл = `chargedPct / 100` |
 | GET | `/api/power/outages` | журнал отключений света: `[{stationName, outage: {stationId, startMs, endMs, socStart, socEnd, minSoc, batteryWh, maxOutputW, approximate}}]`, новые сверху |
 | GET | `/api/net/outages` | журнал сбоев сети `[{kind: ROUTER\|INTERNET, startMs, endMs}]`; текущее состояние — `/api/state` → `hub.net` (проверка каждые 20 с: пинг шлюза Wi-Fi, TCP к 1.1.1.1/8.8.8.8/9.9.9.9) |
+| GET | `/api/router` | роутер ASUS: `{configured, user, connected, model, error, waitingForPassword, lastOkMs, clients, online, wanDownMbps, wanUpMbps}` (пароль не отдаётся) |
+| POST | `/api/router/credentials` | `{user, password}` — логин и пароль администратора роутера; `password: null` — отключить роутер |
+| GET | `/api/router/debug?hook=…` / `?page=/…` | отладка интеграции: сырой ответ роутера; только с самого телефона (`adb forward`), из Wi-Fi — 403 |
 | GET | `/api/net/devices` | устройства в Wi-Fi: `{devices: [{mac, ip, name, hostname, firstSeenMs, lastSeenMs, known}], learnUntilMs, lastScanMs}` (опрос /24 раз в 5 мин, ARP; первые сутки — обучение) |
 | POST/DELETE | `/api/net/devices/{mac}` | `{name?, known?}` — имя и «своё»; DELETE — забыть устройство |
 | POST | `/api/power/stations` | список станций `[{id, name, address}]` (пустой `id` — новая) |
