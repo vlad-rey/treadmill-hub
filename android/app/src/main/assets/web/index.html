@@ -2,47 +2,54 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#101418">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="icon" href="/static/icon-192.png">
   <title>Дорожка</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <header>
+    <button id="profileBtn" class="pill profile">…</button>
     <span id="conn" class="pill">…</span>
     <span id="phase" class="pill muted">—</span>
+    <span id="hr" class="pill hr hidden"></span>
+    <button id="fullscreenBtn" class="icon" aria-label="Во весь экран">⛶</button>
     <button id="settingsBtn" class="icon" aria-label="Настройки">⚙</button>
   </header>
 
   <main>
     <section class="metrics">
-      <div class="metric big"><label>Скорость</label><b id="speed">0.0</b><small>км/ч</small></div>
-      <div class="metric big"><label>Наклон</label><b id="incline">0</b><small id="inclineDeg">% · 0.0°</small></div>
+      <div class="metric big"><label>Скорость, км/ч</label><b id="speed">0.0</b></div>
+      <div class="metric big"><label>Наклон</label><b id="incline">0<small>%</small></b><small id="inclineDeg">0.0°</small></div>
       <div class="metric"><label>Время</label><b id="time">0:00</b></div>
-      <div class="metric"><label>Дистанция</label><b id="distance">0.00</b><small>км</small></div>
-      <div class="metric"><label>Ккал · расчёт</label><b id="kcalCalc">0</b><small id="kcalActive">активные 0</small></div>
-      <div class="metric"><label>Ккал · дорожка</label><b id="kcalTm">—</b><small id="hr">пульс —</small></div>
+      <div class="metric"><label>Дистанция, км</label><b id="distance">0.00</b></div>
+      <div class="metric"><label>Ккал</label><b id="kcalCalc">0</b><small id="kcalTm">дорожка —</small></div>
     </section>
 
-    <section class="controls">
-      <div class="row">
-        <span class="rowLabel">Скорость</span>
-        <button data-act="speedDelta" data-v="-1">−1</button>
-        <button data-act="speedDelta" data-v="-0.1">−0.1</button>
-        <button data-act="speedDelta" data-v="0.1">+0.1</button>
-        <button data-act="speedDelta" data-v="1">+1</button>
+    <section class="pad">
+      <h3>Скорость, км/ч</h3>
+      <div class="grid4">
+        <button class="btn" data-act="speedDelta" data-v="-1">−1</button>
+        <button class="btn" data-act="speedDelta" data-v="-0.1">−0.1</button>
+        <button class="btn" data-act="speedDelta" data-v="0.1">+0.1</button>
+        <button class="btn" data-act="speedDelta" data-v="1">+1</button>
       </div>
-      <div class="row presets" id="speedPresets"></div>
-      <div class="row">
-        <span class="rowLabel">Наклон, %</span>
-        <button data-act="incline" data-v="0">0</button>
-        <button data-act="incline" data-v="5">5</button>
-        <button data-act="incline" data-v="10">10</button>
-        <button data-act="incline" data-v="15">15</button>
+      <div class="grid4" id="speedPresets"></div>
+      <h3>Наклон, %</h3>
+      <div class="grid4" id="inclinePresets">
+        <button class="btn" data-act="incline" data-v="0">0</button>
+        <button class="btn" data-act="incline" data-v="5">5</button>
+        <button class="btn" data-act="incline" data-v="10">10</button>
+        <button class="btn" data-act="incline" data-v="15">15</button>
       </div>
-      <div class="row main hidden" id="pauseRow">
-        <button class="pause" id="pauseBtn" data-act="pause">Пауза</button>
-      </div>
+    </section>
+
+    <section class="stats">
+      <h3>Мои итоги</h3>
+      <div class="statsGrid" id="stats"></div>
     </section>
 
     <details class="buckets">
@@ -51,19 +58,39 @@
     </details>
   </main>
 
-  <!-- Одна большая кнопка: СТАРТ, когда лента стоит, СТОП — когда запущена -->
-  <button id="mainBtn" class="mainBtn start" data-act="start">СТАРТ</button>
+  <!-- СТАРТ, пока лента стоит; ПАУЗА | СТОП (50/50), пока запущена -->
+  <footer class="actionbar">
+    <button id="pauseBtn" class="action pause hidden" data-act="pause">ПАУЗА</button>
+    <button id="mainBtn" class="action start" data-act="start">СТАРТ</button>
+  </footer>
 
   <div id="countdown" class="countdown hidden"></div>
   <div id="toast" class="toast hidden"></div>
 
   <dialog id="settings">
     <form method="dialog">
-      <h2>Настройки</h2>
+      <h2>Мой профиль</h2>
+      <label>Имя <input id="name" maxlength="30"></label>
       <label>Вес, кг <input id="weight" type="number" min="30" max="250" step="0.5"></label>
       <label>Лимит скорости, км/ч <input id="maxSpeed" type="number" min="1" max="16" step="0.5"></label>
+      <div class="grid2"><button class="btn" value="cancel">Отмена</button><button id="saveSettings" value="save" class="btn go">Сохранить</button></div>
+      <button id="switchProfile" class="btn wide" value="switch">Сменить профиль</button>
       <p class="muted" id="hubInfo"></p>
-      <div class="row"><button value="cancel">Отмена</button><button id="saveSettings" value="save" class="go">Сохранить</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="profileDlg">
+    <form method="dialog">
+      <h2>Кто тренируется?</h2>
+      <p class="muted">Телефон запомнит выбор. Вес и лимит скорости хранятся на хабе в вашем профиле.</p>
+      <div class="grid2" id="profileList"></div>
+      <h3>Новый профиль</h3>
+      <label>Имя <input id="newName" maxlength="30" autocomplete="off"></label>
+      <div class="grid2">
+        <label>Вес, кг <input id="newWeight" type="number" min="30" max="250" step="0.5" value="75"></label>
+        <label>Лимит, км/ч <input id="newMax" type="number" min="1" max="16" step="0.5" value="12"></label>
+      </div>
+      <button id="createProfile" class="btn go wide" value="create">Создать и выбрать</button>
     </form>
   </dialog>
 

@@ -135,7 +135,8 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
 
     override suspend fun command(cmd: Command): CommandResult {
         if (!manager.isConnected || manager.cp == null) return CommandResult(false, "дорожка не подключена")
-        Limits.check(cmd, config.maxSpeedKmh)?.let { return CommandResult(false, it) }
+        // Жёсткий предел дорожки; лимит профиля проверяет Hub
+        Limits.check(cmd, Limits.MAX_SPEED_KMH)?.let { return CommandResult(false, it) }
         val bytes = when (cmd) {
             Command.Start -> Ftms.start()
             Command.Stop -> Ftms.stop()
@@ -223,6 +224,7 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
                 phase = phase,
                 countdown = st.countdown,
                 kcal = kcal,
+                vendorRaw = st.unknown ?: if (phase == Phase.IDLE) null else s.vendorRaw,
             )
         }
     }

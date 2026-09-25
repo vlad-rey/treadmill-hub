@@ -3,6 +3,9 @@ package io.github.vladrey.treadmillhub
 import android.content.res.AssetManager
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.github.vladrey.treadmillhub.session.ConsoleReading
+import io.github.vladrey.treadmillhub.session.ProfilePatch
+import kotlinx.serialization.Serializable
 import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
@@ -23,12 +26,17 @@ import java.io.FileNotFoundException
 
 private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
+@Serializable
+private data class ProfileRef(val profileId: String? = null)
+
 /** HTTP + WebSocket API хаба и статика веб-интерфейса из assets/web. */
 class HubServer(private val hub: Hub, private val assets: AssetManager, port: Int) {
     private val engine: ApplicationEngine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
         install(WebSockets) { pingPeriodMillis = 15_000 }
         routing {
             get("/") { call.respondAsset("index.html") }
+            // Service worker должен отдаваться из корня, чтобы управлять всем приложением
+            get("/sw.js") { call.respondAsset("sw.js") }
             get("/static/{path...}") {
                 val path = call.parameters.getAll("path")?.joinToString("/").orEmpty()
                 if (path.contains("..")) call.respondText("", status = HttpStatusCode.BadRequest)
@@ -45,6 +53,46 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                     val r = hub.control(req)
                     call.respondJson(json.encodeToString(r), if (r.ok) HttpStatusCode.OK else HttpStatusCode.Conflict)
                 }
+            }
+
+            get("/api/profiles") { call.respondJson(json.encodeToString(hub.profiles.all())) }
+            post("/api/profiles") {
+                val r = runCatching { hub.profiles.create(json.decodeFromString<ProfilePatch>(call.receiveText())) }
+                r.fold({ call.respondJson(json.encodeToString(it)) }, { call.respondError(it) })
+            }
+            post("/api/profiles/{id}") {
+                val id = call.parameters["id"].orEmpty()
+                val r = runCatching { hub.profiles.update(id, json.decodeFromString<ProfilePatch>(call.receiveText())) }
+                r.fold(
+                    { if (it == null) call.respondJson("""{"error":"профиль не найден"}""", HttpStatusCode.NotFound) else call.respondJson(json.encodeToString(it)) },
+                    { call.respondError(it) },
+                )
+            }
+            // Итоги: сегодня / неделя / месяц / всё время. profile пустой — тренировки без владельца
+            get("/api/stats") { call.respondJson(json.encodeToString(hub.stats(call.request.queryParameters["profile"]?.ifBlank { null }))) }
+
+            get("/api/sessions") {
+                val profile = call.request.queryParameters["profile"]
+                val list = hub.history.list().let { all -> if (profile == null) all else all.filter { it.profileId == profile.ifBlank { null } } }
+                call.respondJson(json.encodeToString(list))
+            }
+            post("/api/sessions/{id}/profile") {
+                val id = call.parameters["id"]?.toLongOrNull()
+                val body = runCatching { json.decodeFromString<ProfileRef>(call.receiveText()) }.getOrNull()
+                val ok = id != null && body != null && (body.profileId == null || hub.profiles.get(body.profileId) != null) &&
+                    hub.history.setProfile(id, body.profileId)
+                call.respondJson("""{"ok":$ok}""", if (ok) HttpStatusCode.OK else HttpStatusCode.BadRequest)
+            }
+            get("/api/sessions/{id}") {
+                val s = call.parameters["id"]?.toLongOrNull()?.let(hub.history::load)
+                if (s == null) call.respondJson("""{"error":"не найдено"}""", HttpStatusCode.NotFound)
+                else call.respondJson(json.encodeToString(s))
+            }
+            post("/api/sessions/{id}/console") {
+                val id = call.parameters["id"]?.toLongOrNull()
+                val reading = runCatching { json.decodeFromString<ConsoleReading>(call.receiveText()) }.getOrNull()
+                val ok = id != null && reading != null && hub.history.setConsole(id, reading)
+                call.respondJson("""{"ok":$ok}""", if (ok) HttpStatusCode.OK else HttpStatusCode.BadRequest)
             }
 
             get("/api/config") { call.respondJson(json.encodeToString(hub.config.toDto())) }
@@ -68,6 +116,9 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
 
     private suspend fun io.ktor.server.application.ApplicationCall.respondJson(body: String, status: HttpStatusCode = HttpStatusCode.OK) =
         respondText(body, ContentType.Application.Json, status)
+
+    private suspend fun io.ktor.server.application.ApplicationCall.respondError(e: Throwable) =
+        respondJson("""{"error":${json.encodeToString(e.message ?: "ошибка")}}""", HttpStatusCode.BadRequest)
 
     private suspend fun io.ktor.server.application.ApplicationCall.respondAsset(path: String) {
         val bytes = try {

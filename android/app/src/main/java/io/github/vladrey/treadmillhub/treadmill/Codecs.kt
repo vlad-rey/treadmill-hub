@@ -115,6 +115,8 @@ object FitShow {
         val elapsedS: Int? = null,
         /** Гипотеза: поле в десятых долях ккал (сошлось с FTMS на 1 ккал). */
         val kcal: Double? = null,
+        /** Поля, смысл которых ещё не ясен (смещения 6, 10, 12) — пишутся в историю для сверки с пультом. */
+        val unknown: List<Int>? = null,
     )
 
     /** Кадр статуса 0x51: 00 ожидание, 02 отсчёт, 03 движение, 04 торможение/после стопа. */
@@ -130,6 +132,7 @@ object FitShow {
                 inclinePct = u8(p, 3).toDouble(),
                 elapsedS = u16(p, 4),
                 kcal = u16(p, 8) / 10.0,
+                unknown = listOf(6, 10, 12).filter { it + 1 < p.size }.map { u16(p, it) },
             )
             else -> Status(state)
         }

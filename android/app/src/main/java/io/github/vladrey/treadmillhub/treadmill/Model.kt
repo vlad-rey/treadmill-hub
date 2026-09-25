@@ -24,6 +24,8 @@ data class TreadmillState(
     /** Калории по данным дорожки (FitShow, шаг 0,1 ккал; иначе FTMS, шаг 1 ккал). */
     val kcal: Double? = null,
     val heartRate: Int? = null,
+    /** Нерасшифрованные поля статуса FitShow — для сверки с пультом дорожки. */
+    val vendorRaw: List<Int>? = null,
     val updatedAtMs: Long = 0,
 )
 

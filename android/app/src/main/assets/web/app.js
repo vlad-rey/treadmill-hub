@@ -2,10 +2,68 @@
 
 const $ = (id) => document.getElementById(id);
 const PHASES = { IDLE: "ожидание", COUNTDOWN: "отсчёт", RUNNING: "движение", PAUSED: "пауза", STOPPING: "торможение", FINISHED: "остановлена" };
-const CONN = { CONNECTED: "дорожка подключена", CONNECTING: "подключение…", SCANNING: "поиск дорожки…", DISCONNECTED: "нет связи с дорожкой" };
+const CONN = { CONNECTED: "дорожка на связи", CONNECTING: "подключение…", SCANNING: "поиск дорожки…", DISCONNECTED: "нет связи с дорожкой" };
+const ACTIVE_PHASES = ["COUNTDOWN", "RUNNING", "PAUSED", "STOPPING"];
+const SPEED_PRESETS = [3, 4, 5, 6, 7, 8, 10, 12, 14, 16];
 
-let last = null;
 let toastTimer = 0;
+
+// --- Профиль: хранится на хабе, телефон помнит только свой id -------------------------
+let profiles = [];
+let me = null;
+const store = {
+  get: () => { try { return localStorage.getItem("profileId"); } catch (_) { return null; } },
+  set: (id) => { try { localStorage.setItem("profileId", id); } catch (_) {} },
+};
+
+async function loadProfiles() {
+  profiles = await (await fetch("/api/profiles")).json();
+  me = profiles.find((p) => p.id === store.get()) || null;
+  $("profileBtn").textContent = me ? me.name : "кто вы?";
+  presetsFor = null;
+  if (!me) openProfileDialog(); else loadStats();
+}
+
+function openProfileDialog() {
+  $("profileList").innerHTML = profiles
+    .map((p) => `<button class="btn${me && me.id === p.id ? " current" : ""}" data-profile="${p.id}" value="pick">${p.name}</button>`)
+    .join("");
+  $("profileDlg").showModal();
+}
+
+$("profileList").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-profile]");
+  if (!b) return;
+  store.set(b.dataset.profile);
+  loadProfiles();
+});
+
+$("createProfile").onclick = async (e) => {
+  const name = $("newName").value.trim();
+  if (!name) { e.preventDefault(); $("newName").focus(); return; }
+  const r = await fetch("/api/profiles", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, weightKg: Number($("newWeight").value), maxSpeedKmh: Number($("newMax").value) }),
+  });
+  const body = await r.json();
+  if (!r.ok) { toast(body.error || "не создано"); return; }
+  store.set(body.id);
+  loadProfiles();
+};
+
+$("profileBtn").onclick = openProfileDialog;
+
+// --- Итоги: сегодня / неделя / месяц / всё время ---------------------------------------
+async function loadStats() {
+  if (!me) return;
+  const st = await (await fetch("/api/stats?profile=" + encodeURIComponent(me.id))).json();
+  const card = (label, t) => `<div class="stat"><label>${label}</label>
+    <b>${(t.distanceM / 1000).toFixed(2)} км</b>
+    <small>${fmtTime(t.movingS)} · ${Math.round(t.kcalCalc)} ккал (дорожка ${Math.round(t.kcalTreadmill)})</small></div>`;
+  $("stats").innerHTML = card("Сегодня", st.today) + card("Неделя", st.week) + card("Месяц", st.month) + card("Всё время", st.all);
+}
+setInterval(loadStats, 60_000);
 
 function fmtTime(s) {
   s = Math.floor(s || 0);
@@ -14,32 +72,42 @@ function fmtTime(s) {
 }
 
 function render(snap) {
-  last = snap;
   const t = snap.treadmill, s = snap.session, hub = snap.hub;
-
   const connected = t.connection === "CONNECTED";
+
   $("conn").textContent = CONN[t.connection] || t.connection;
   $("conn").className = "pill " + (connected ? "ok" : "bad");
-  $("phase").textContent = PHASES[t.phase] || t.phase;
+  const others = snap.ownerName && (!me || snap.ownerProfileId !== me.id) && s.active;
+  $("phase").textContent = (PHASES[t.phase] || t.phase) + (others ? " · " + snap.ownerName : "");
+
+  // Тренировка закончилась — обновить итоги
+  if (wasActive && !s.active) loadStats();
+  wasActive = s.active;
+  $("hr").classList.toggle("hidden", !t.heartRate);
+  $("hr").textContent = "♥ " + (t.heartRate || "");
 
   $("speed").textContent = t.speedKmh.toFixed(1);
-  $("incline").textContent = Math.round(t.inclinePct);
-  $("inclineDeg").textContent = "% · " + (Math.atan(t.inclinePct / 100) * 180 / Math.PI).toFixed(1) + "°";
+  $("incline").firstChild.nodeValue = Math.round(t.inclinePct);
+  $("inclineDeg").textContent = (Math.atan(t.inclinePct / 100) * 180 / Math.PI).toFixed(1) + "°";
   $("time").textContent = fmtTime(s.movingS || t.elapsedS);
   $("distance").textContent = (s.distanceM / 1000).toFixed(2);
   $("kcalCalc").textContent = Math.round(s.kcalCalc);
-  $("kcalActive").textContent = "активные " + Math.round(s.kcalActiveCalc);
-  $("kcalTm").textContent = t.kcal == null ? "—" : t.kcal.toFixed(1);
-  $("hr").textContent = "пульс " + (t.heartRate || "—");
+  $("kcalTm").textContent = "дорожка " + (t.kcal == null ? "—" : t.kcal.toFixed(1));
 
-  const cd = $("countdown");
-  cd.classList.toggle("hidden", t.phase !== "COUNTDOWN");
-  if (t.phase === "COUNTDOWN") cd.textContent = t.countdown ?? "";
+  $("countdown").classList.toggle("hidden", t.phase !== "COUNTDOWN");
+  if (t.phase === "COUNTDOWN") $("countdown").textContent = t.countdown ?? "";
 
-  renderMainButton(t, connected);
-  document.querySelectorAll(".controls [data-act]").forEach((b) => { b.disabled = !connected; });
+  renderPresets(me ? me.maxSpeedKmh : hub.maxSpeedKmh);
+  document.querySelectorAll(".pad .btn").forEach((b) => {
+    b.disabled = !connected;
+    const v = Number(b.dataset.v);
+    b.classList.toggle("current",
+      (b.dataset.act === "speed" && t.phase === "RUNNING" && Math.abs(t.speedKmh - v) < 0.05) ||
+      (b.dataset.act === "incline" && Math.round(t.inclinePct) === v));
+  });
+  renderActions(t, connected);
+  keepScreenOn(ACTIVE_PHASES.includes(t.phase));
 
-  renderPresets(hub.maxSpeedKmh);
   $("bucketRows").innerHTML = (s.buckets || [])
     .filter((b) => b.seconds >= 1)
     .sort((a, b) => a.speedKmh - b.speedKmh || a.inclinePct - b.inclinePct)
@@ -47,43 +115,72 @@ function render(snap) {
     .join("");
   $("hubInfo").textContent =
     `Хаб ${hub.version} · ${hub.backend === "sim" ? "симулятор" : "FTMS"} · батарея ${hub.batteryPct ?? "?"}%` +
-    (hub.batteryTempC != null ? `, ${hub.batteryTempC.toFixed(1)} °C` : "");
+    (hub.batteryTempC != null ? `, ${hub.batteryTempC.toFixed(1)} °C` : "") +
+    ` · ккал: расчёт активные ${Math.round(s.kcalActiveCalc)}`;
 }
 
-const ACTIVE_PHASES = ["COUNTDOWN", "RUNNING", "PAUSED", "STOPPING"];
-let mainMode = null;
-let mainLockedUntil = 0;
-
-/** СТАРТ, пока лента стоит; СТОП, пока запущена. Смена режима блокирует кнопку на секунду от двойного нажатия. */
-function renderMainButton(t, connected) {
-  const active = ACTIVE_PHASES.includes(t.phase);
-  const mode = active ? "stop" : "start";
-  const btn = $("mainBtn");
-  if (mode !== mainMode) {
-    if (mainMode !== null) mainLockedUntil = Date.now() + 1000;
-    mainMode = mode;
-    btn.dataset.act = mode;
-    btn.textContent = active ? "СТОП" : "СТАРТ";
-    btn.className = "mainBtn " + mode;
-  }
-  // СТОП доступен всегда; СТАРТ — только при связи с дорожкой
-  btn.disabled = mode === "start" && !connected;
-
-  $("pauseRow").classList.toggle("hidden", !(t.phase === "RUNNING" || t.phase === "PAUSED"));
-  const paused = t.phase === "PAUSED";
-  $("pauseBtn").dataset.act = paused ? "start" : "pause";
-  $("pauseBtn").textContent = paused ? "Продолжить" : "Пауза";
-}
-
+let wasActive = false;
 let presetsFor = null;
 function renderPresets(max) {
   if (presetsFor === max) return;
   presetsFor = max;
-  const values = [3, 4, 5, 6, 8, 10, 12, 14, 16].filter((v) => v <= max);
-  $("speedPresets").innerHTML = '<span class="rowLabel"></span>' +
-    values.map((v) => `<button data-act="speed" data-v="${v}">${v}</button>`).join("");
+  // Ровно 8 кнопок (2 ряда по 4): самые ходовые скорости в пределах лимита
+  const values = SPEED_PRESETS.filter((v) => v <= max).slice(0, 8);
+  $("speedPresets").innerHTML = values.map((v) => `<button class="btn" data-act="speed" data-v="${v}">${v}</button>`).join("");
 }
 
+// --- Нижняя панель: СТАРТ или ПАУЗА|СТОП ---------------------------------------------
+let mainMode = null;
+let mainLockedUntil = 0;
+
+function renderActions(t, connected) {
+  const active = ACTIVE_PHASES.includes(t.phase);
+  const mode = active ? "stop" : "start";
+  const main = $("mainBtn"), pause = $("pauseBtn");
+  if (mode !== mainMode) {
+    // смена СТАРТ ↔ СТОП: секунда блокировки от случайного двойного нажатия
+    if (mainMode !== null) mainLockedUntil = Date.now() + 1000;
+    mainMode = mode;
+    main.dataset.act = mode;
+    main.textContent = active ? "СТОП" : "СТАРТ";
+  }
+  const showPause = t.phase === "RUNNING" || t.phase === "PAUSED";
+  main.className = "action " + mode + (active && !showPause ? " solo" : "");
+  main.disabled = mode === "start" && !connected; // СТОП доступен всегда
+
+  pause.classList.toggle("hidden", !showPause);
+  pause.dataset.act = t.phase === "PAUSED" ? "start" : "pause";
+  pause.textContent = t.phase === "PAUSED" ? "ДАЛЬШЕ" : "ПАУЗА";
+}
+
+// --- Экран: полный экран и запрет засыпания -------------------------------------------
+function inFullscreen() {
+  return document.fullscreenElement || matchMedia("(display-mode: fullscreen), (display-mode: standalone)").matches;
+}
+function enterFullscreen() {
+  if (inFullscreen() || !document.documentElement.requestFullscreen) return;
+  document.documentElement.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+}
+function syncFullscreenBtn() { $("fullscreenBtn").classList.toggle("hidden", !!inFullscreen()); }
+document.addEventListener("fullscreenchange", syncFullscreenBtn);
+$("fullscreenBtn").onclick = enterFullscreen;
+syncFullscreenBtn();
+
+let wakeLock = null;
+async function keepScreenOn(on) {
+  // Screen Wake Lock работает только в защищённом контексте (HTTPS или флаг Chrome, см. docs)
+  if (!("wakeLock" in navigator)) return;
+  try {
+    if (on && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; });
+    } else if (!on && wakeLock) {
+      await wakeLock.release();
+    }
+  } catch (_) { /* нет разрешения — экран может погаснуть */ }
+}
+
+// --- Команды ----------------------------------------------------------------------
 function toast(msg) {
   const el = $("toast");
   el.textContent = msg;
@@ -93,11 +190,13 @@ function toast(msg) {
 }
 
 async function control(action, value) {
+  // Тренировка записывается на того, кто нажал СТАРТ — без профиля не начинаем
+  if (action === "start" && !me) { openProfileDialog(); return; }
   try {
     const r = await fetch("/api/control", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(value == null ? { action } : { action, value }),
+      body: JSON.stringify({ action, value, profileId: me ? me.id : null }),
     });
     const body = await r.json();
     if (!body.ok) toast(body.message);
@@ -110,6 +209,7 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-act]");
   if (!b || b.disabled) return;
   if (b.id === "mainBtn" && Date.now() < mainLockedUntil) return;
+  enterFullscreen(); // первое же нажатие убирает адресную строку
   if (navigator.vibrate) navigator.vibrate(15);
   control(b.dataset.act, b.dataset.v == null ? null : Number(b.dataset.v));
 });
@@ -124,19 +224,25 @@ function connectLive() {
   };
 }
 
-$("settingsBtn").onclick = async () => {
-  const cfg = await (await fetch("/api/config")).json();
-  $("weight").value = cfg.weightKg;
-  $("maxSpeed").value = cfg.maxSpeedKmh;
+$("settingsBtn").onclick = () => {
+  if (!me) { openProfileDialog(); return; }
+  $("name").value = me.name;
+  $("weight").value = me.weightKg;
+  $("maxSpeed").value = me.maxSpeedKmh;
   $("settings").showModal();
 };
 $("saveSettings").onclick = async () => {
-  const r = await fetch("/api/config", {
+  const r = await fetch("/api/profiles/" + encodeURIComponent(me.id), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ weightKg: Number($("weight").value), maxSpeedKmh: Number($("maxSpeed").value) }),
+    body: JSON.stringify({ name: $("name").value.trim(), weightKg: Number($("weight").value), maxSpeedKmh: Number($("maxSpeed").value) }),
   });
-  if (!r.ok) toast((await r.json()).error || "не сохранено");
+  if (!r.ok) { toast((await r.json()).error || "не сохранено"); return; }
+  loadProfiles();
 };
+$("switchProfile").onclick = () => setTimeout(openProfileDialog, 0);
 
+if ("serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("/sw.js").catch(() => {});
+
+loadProfiles().catch(() => toast("хаб недоступен"));
 connectLive();
