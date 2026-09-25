@@ -25,8 +25,10 @@ class ProgramTest {
         assertEquals(30 * 60, segs.sumOf { it.durationS })
         assertEquals(4.0, segs[0].speedKmh, 0.0)     // P2 ур. 8: скорость 4, 6, 8…
         assertEquals(5.0, segs[0].inclinePct!!, 0.0) // наклон 5, 7, 9…
-        // 7 минут не делятся на 18 поровну — остаток уходит в последний отрезок
-        assertEquals(7 * 60, builtin.segments("P1", 1, 7)!!.sumOf { it.durationS })
+        // 5 минут не делятся на 18 поровну — отрезки по 16–17 с, сумма точно 300 с
+        val five = builtin.segments("P1", 1, 5)!!
+        assertEquals(5 * 60, five.sumOf { it.durationS })
+        assertTrue(five.all { it.durationS in 16..17 })
         assertNull(builtin.segments("P1", 1, 30)!![0].inclinePct) // P1 меняет только скорость
     }
 

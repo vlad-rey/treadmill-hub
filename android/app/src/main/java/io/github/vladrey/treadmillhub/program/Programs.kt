@@ -59,8 +59,8 @@ class BuiltinPrograms(jsonText: String) {
         val n = lv.speed.size
         val total = minutes.coerceIn(5, 99) * 60
         return lv.speed.indices.map { i ->
-            // последний отрезок забирает остаток от деления, чтобы сумма совпала с заданным временем
-            val d = if (i == n - 1) total - (total / n) * (n - 1) else total / n
+            // остаток от деления распределяется по секунде на отрезок: 300 с / 18 → 16 или 17 с
+            val d = (i + 1) * total / n - i * total / n
             Segment(d, lv.speed[i].toDouble(), lv.incline?.getOrNull(i)?.toDouble())
         }
     }
