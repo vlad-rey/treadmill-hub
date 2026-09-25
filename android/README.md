@@ -1,3 +1,32 @@
-# android
+# android — хаб
 
-Android-хаб (Kotlin). Появится на этапе 2: BLE-сервис, `TreadmillBackend` (FitShow / FTMS / Simulator), движок программ, Room, Ktor (REST + WebSocket), debug API.
+Kotlin, `minSdk 28` (Redmi 6: Android 9, 32-битный). Foreground service `HubService`:
+
+- `treadmill/` — `TreadmillBackend`: `FtmsBleBackend` (FTMS + FitShow FFF1, библиотека Nordic BLE) и `SimulatorBackend`; разбор пакетов в `Codecs.kt`.
+- `session/` — учёт тренировки: дистанция по скорости (FTMS на T12B отдаёт 0), разбивка «скорость × наклон», калории по ACSM.
+- `HubServer.kt` — Ktor (CIO): REST, WebSocket, статика веб-интерфейса из `assets/web`.
+
+## Сборка и установка
+
+```bash
+powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
+```
+
+Нужны JDK 17 и Android SDK. Скрипт гоняет unit-тесты, собирает APK, ставит через root (`pm install` — MIUI блокирует `adb install`), выдаёт разрешения и перезапускает сервис. Автозапуск при загрузке — Magisk-скрипт `40-treadmill-hub.sh` из [redmi6-homeserver](https://github.com/vlad-rey/redmi6-homeserver).
+
+Версии подобраны под AGP 8.13: Kotlin 2.2.21, coroutines 1.10.2, serialization 1.9.0 (более новые собраны Kotlin 2.4, D8 из AGP 8.13 их метаданные не понимает).
+
+## API (порт 8080)
+
+| Метод | Путь | Что |
+|---|---|---|
+| GET | `/` | веб-интерфейс |
+| GET | `/api/state` | снимок: `treadmill`, `session`, `hub` |
+| WS | `/ws/live` | тот же снимок при каждом изменении (~1 Гц) |
+| POST | `/api/control` | `{"action": "start\|stop\|pause\|speed\|incline\|speedDelta\|inclineDelta", "value": 5.0}` |
+| GET/POST | `/api/config` | `deviceAddress`, `backend` (`ftms`/`sim`), `weightKg`, `maxSpeedKmh` (по умолчанию 12) |
+| WS | `/ws/debug/ble` | сырые BLE-пакеты в hex (для агентов) |
+
+Лимиты проверяются на хабе: скорость 1–min(лимит, 16) км/ч, наклон 0–15 %. `stop` не ждёт в очереди за другими командами.
+
+**Агентам:** `/api/control` двигает ленту — только с подтверждением владельца (см. `CLAUDE.md`). Для проверок без риска — `backend: "sim"` и перезапуск сервиса.

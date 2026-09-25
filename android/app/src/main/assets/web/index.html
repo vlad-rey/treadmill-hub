@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101418">
+  <title>Дорожка</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <span id="conn" class="pill">…</span>
+    <span id="phase" class="pill muted">—</span>
+    <button id="settingsBtn" class="icon" aria-label="Настройки">⚙</button>
+  </header>
+
+  <main>
+    <section class="metrics">
+      <div class="metric big"><label>Скорость</label><b id="speed">0.0</b><small>км/ч</small></div>
+      <div class="metric big"><label>Наклон</label><b id="incline">0</b><small id="inclineDeg">% · 0.0°</small></div>
+      <div class="metric"><label>Время</label><b id="time">0:00</b></div>
+      <div class="metric"><label>Дистанция</label><b id="distance">0.00</b><small>км</small></div>
+      <div class="metric"><label>Ккал · расчёт</label><b id="kcalCalc">0</b><small id="kcalActive">активные 0</small></div>
+      <div class="metric"><label>Ккал · дорожка</label><b id="kcalTm">—</b><small id="hr">пульс —</small></div>
+    </section>
+
+    <section class="controls">
+      <div class="row">
+        <span class="rowLabel">Скорость</span>
+        <button data-act="speedDelta" data-v="-1">−1</button>
+        <button data-act="speedDelta" data-v="-0.1">−0.1</button>
+        <button data-act="speedDelta" data-v="0.1">+0.1</button>
+        <button data-act="speedDelta" data-v="1">+1</button>
+      </div>
+      <div class="row presets" id="speedPresets"></div>
+      <div class="row">
+        <span class="rowLabel">Наклон</span>
+        <button data-act="inclineDelta" data-v="-1">−1 %</button>
+        <button data-act="inclineDelta" data-v="1">+1 %</button>
+        <button data-act="incline" data-v="0">0</button>
+        <button data-act="incline" data-v="5">5</button>
+        <button data-act="incline" data-v="10">10</button>
+        <button data-act="incline" data-v="15">15</button>
+      </div>
+      <div class="row main">
+        <button class="go" data-act="start">Старт</button>
+        <button class="pause" data-act="pause">Пауза</button>
+      </div>
+    </section>
+
+    <details class="buckets">
+      <summary>Дистанция по скорости и наклону</summary>
+      <table><thead><tr><th>км/ч</th><th>%</th><th>время</th><th>м</th></tr></thead><tbody id="bucketRows"></tbody></table>
+    </details>
+  </main>
+
+  <button id="stop" class="stop" data-act="stop">СТОП</button>
+
+  <div id="countdown" class="countdown hidden"></div>
+  <div id="toast" class="toast hidden"></div>
+
+  <dialog id="settings">
+    <form method="dialog">
+      <h2>Настройки</h2>
+      <label>Вес, кг <input id="weight" type="number" min="30" max="250" step="0.5"></label>
+      <label>Лимит скорости, км/ч <input id="maxSpeed" type="number" min="1" max="16" step="0.5"></label>
+      <p class="muted" id="hubInfo"></p>
+      <div class="row"><button value="cancel">Отмена</button><button id="saveSettings" value="save" class="go">Сохранить</button></div>
+    </form>
+  </dialog>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
