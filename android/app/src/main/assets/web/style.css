@@ -106,21 +106,45 @@ button { font: inherit; color: var(--text); touch-action: manipulation; }
 .bar { height: 10px; background: #0d1115; border-radius: 99px; overflow: hidden; margin: 6px 0 2px; }
 .bar i { display: block; height: 100%; background: linear-gradient(90deg, #2fbf71, #9be15d); border-radius: 99px; }
 .rewardCard.earned .bar i { background: linear-gradient(90deg, #f7b733, #ffd86b); }
+/* Ачивки: плитки в ряду одной высоты (полоска прогресса прижата к низу); грейд — цветная метка под иконкой (не налезает на иконку и название) */
 .achGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--gap); }
-.ach { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 6px; text-align: center; position: relative; }
-.ach .aIcon { width: 58px; height: 58px; margin: 0 auto 6px; border-radius: 50%; display: grid; place-items: center; font-size: 30px; border: 3px solid var(--g); background: radial-gradient(circle, #232b34 55%, #151a20); }
-.ach b { display: block; font-size: 13px; line-height: 1.2; }
-.ach small { display: block; color: var(--muted); font-size: 11px; line-height: 1.25; margin-top: 3px; }
-.ach .bar { height: 5px; }
+.ach {
+  display: flex; flex-direction: column; align-items: center; min-width: 0;
+  background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 5px 9px; text-align: center;
+}
+.ach .aIcon { flex: none; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; font-size: 30px; line-height: 1; border: 3px solid var(--g); background: radial-gradient(circle, #232b34 55%, #151a20); }
+.gradeTag {
+  position: relative; z-index: 1; flex: none; margin: -9px 0 5px; padding: 1px 7px; border-radius: 99px;
+  border: 1px solid var(--g); background: #12171d; color: var(--g);
+  font-size: 10px; line-height: 14px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; white-space: nowrap;
+}
+.ach b, .ach small { width: 100%; overflow-wrap: anywhere; -webkit-hyphens: auto; hyphens: auto; }
+.ach b { display: block; font-size: 13.5px; line-height: 1.2; }
+.ach small {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden;
+  color: var(--muted); font-size: 11.5px; line-height: 1.3; margin: 3px 0 6px;
+}
+/* Полоска прогресса прижата к низу плитки — у всех на одном уровне */
+.ach .bar { flex: none; width: calc(100% - 8px); height: 5px; margin: auto 0 0; }
 .ach.locked .aIcon { filter: grayscale(1) brightness(.55); border-color: #3a434d; }
+.ach.locked .gradeTag { opacity: .7; }
 .ach.locked b { color: var(--muted); }
+.ach.earned { border-color: #34404c; }
 .ach.earned .aIcon { box-shadow: 0 0 14px var(--g); }
 .g-BRONZE { --g: #cd7f32; } .g-SILVER { --g: #c9d1d9; } .g-GOLD { --g: #ffcc33; } .g-PLATINUM { --g: #7ff0ff; } .g-LEGEND { --g: #d86bff; }
 .ach.earned.g-LEGEND .aIcon { animation: legend 3s linear infinite; }
 .ach.earned.g-PLATINUM .aIcon { animation: shimmer 2.5s ease-in-out infinite; }
 @keyframes legend { 0% { box-shadow: 0 0 16px #ff5f6d; border-color: #ff5f6d; } 33% { box-shadow: 0 0 22px #ffc371; border-color: #ffc371; } 66% { box-shadow: 0 0 22px #7ff0ff; border-color: #7ff0ff; } 100% { box-shadow: 0 0 16px #d86bff; border-color: #d86bff; } }
 @keyframes shimmer { 50% { box-shadow: 0 0 24px #7ff0ff; } }
-.gradeTag { position: absolute; top: 6px; right: 8px; font-size: 9px; letter-spacing: .5px; color: var(--g); text-transform: uppercase; }
+@media (min-width: 900px) {
+  .achGrid { grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); }
+  .ach { padding: 16px 10px 14px; border-radius: 18px; }
+  .ach .aIcon { width: 84px; height: 84px; font-size: 44px; border-width: 4px; }
+  .gradeTag { margin: -12px 0 8px; padding: 2px 10px; font-size: 13px; line-height: 18px; }
+  .ach b { font-size: 18px; }
+  .ach small { font-size: 15px; margin-top: 5px; }
+  .ach .bar { height: 7px; }
+}
 .deliver { margin-top: 6px; height: 36px !important; font-size: 13px !important; padding: 0 10px !important; }
 
 /* --- Праздник --- */

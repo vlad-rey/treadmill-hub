@@ -41,6 +41,27 @@ function rewardCard(r, canDeliver) {
   </div>`;
 }
 
+// Мягкие переносы (U+00AD) в длинных (от 11 букв) русских словах: узкая плитка (~100 px) не вмещает
+// «Перфекционист», а hyphens: auto есть не во всех браузерах (на компьютере часто нет словаря).
+// Упрощённые правила слогоделения: гласная|согласная+гласная, согласная|согласная+гласная, после Й/Ь/Ъ.
+const VOWELS = "аеёиоуыэюя";
+function softHyphens(text) {
+  return text.replace(/[а-яё]{11,}/gi, (w) => {
+    const v = (i) => VOWELS.includes(w[i].toLowerCase());
+    const sign = (i) => "йьъ".includes(w[i].toLowerCase());
+    let out = w[0];
+    for (let i = 1; i < w.length; i++) {
+      const left = w.slice(0, i), right = w.slice(i);
+      const ok = left.length >= 2 && right.length >= 3 && /[аеёиоуыэюя]/i.test(left) && /[аеёиоуыэюя]/i.test(right) && !sign(i) && (
+        (v(i - 1) && !v(i) && v(i + 1)) ||                          // во|да
+        (!v(i - 1) && !sign(i - 1) && !v(i) && v(i + 1) && v(i - 2)) || // пер|фект
+        sign(i - 1));                                                 // конь|ки
+      out += (ok ? "\u00AD" : "") + w[i];
+    }
+    return out;
+  });
+}
+
 function renderAchievements(list) {
   const got = list.filter((a) => a.earnedAtMs).length;
   $("achTitle").textContent = `Ачивки · ${got} из ${list.length}`;
@@ -48,14 +69,20 @@ function renderAchievements(list) {
     (b.earnedAtMs ? 1 : 0) - (a.earnedAtMs ? 1 : 0) ||
     GRADE_ORDER.indexOf(a.grade) - GRADE_ORDER.indexOf(b.grade) ||
     b.progress - a.progress);
+  // Порядок в плитке: иконка → грейд (метка под иконкой) → название → описание → полоска прогресса внизу.
+  // В описании число не отрывается от следующего слова («10 м») и «км/ч» не рвётся по «/».
   $("achGrid").innerHTML = sorted.map((a) => {
     const hidden = a.secret && !a.earnedAtMs;
-    const bar = !a.earnedAtMs && !hidden && a.progress > 0 ? `<div class="bar"><i style="width:${a.progress * 100}%"></i></div>` : "";
-    return `<div class="ach g-${a.grade} ${a.earnedAtMs ? "earned" : "locked"}">
-      <span class="gradeTag">${GRADE[a.grade]}</span>
+    const title = hidden ? "???" : a.title;
+    const text = hidden ? "Секретная ачивка" : a.description;
+    const pct = Math.round(a.progress * 100);
+    const bar = !a.earnedAtMs && !hidden && a.progress > 0
+      ? `<div class="bar" title="${pct} %"><i style="width:${pct}%"></i></div>` : "";
+    return `<div class="ach g-${a.grade} ${a.earnedAtMs ? "earned" : "locked"}" title="${esc(title)} — ${esc(text)}">
       <div class="aIcon">${hidden ? "❓" : a.icon}</div>
-      <b>${hidden ? "???" : esc(a.title)}</b>
-      <small>${hidden ? "Секретная ачивка" : esc(a.description)}</small>
+      <span class="gradeTag">${GRADE[a.grade]}</span>
+      <b>${esc(softHyphens(title))}</b>
+      <small>${esc(softHyphens(text).replace(/(\d) /g, "$1\u00A0").replace(/\/(?=\S)/g, "/\u2060"))}</small>
       ${bar}
     </div>`;
   }).join("");
