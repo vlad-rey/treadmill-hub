@@ -15,7 +15,7 @@
 | Устройство | Роль | Заметки |
 |---|---|---|
 | FitLogic T12B | Дорожка | 1–16 км/ч, наклон 0–15 % (≈ 0–8,5°), 12 программ, пульс с поручней. BLE-модуль FitShow |
-| Xiaomi Redmi 6 4/64 (`cereus`, Helio P22) | Хаб, домашний мини-сервер | MIUI Global 11.0.4.0, Android 9 (API 28) → хаб: `minSdk 28`. Будет с root, см. redmi6-homeserver |
+| Xiaomi Redmi 6 4/64 (`cereus`, Helio P22) | Хаб, домашний мини-сервер | MIUI Global 11.0.4.0, Android 9 (API 28), **32-битный** (`armeabi-v7a`) → хаб: `minSdk 28`, нативные зависимости только с поддержкой `armeabi-v7a`. Будет с root, см. redmi6-homeserver |
 | Pixel 9, Pixel 10 | Клиенты | Chrome, PWA |
 | PC (Windows, Bluetooth) | Разработка | Стоит рядом с дорожкой: прототип протокола на `bleak` |
 
