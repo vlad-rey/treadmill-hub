@@ -47,6 +47,8 @@ powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 | GET | `/api/net/outages` | журнал сбоев сети `[{kind: ROUTER\|INTERNET, startMs, endMs}]`; текущее состояние — `/api/state` → `hub.net` (проверка каждые 20 с: пинг шлюза Wi-Fi, TCP к 1.1.1.1/8.8.8.8/9.9.9.9) |
 | GET | `/api/router` | роутер ASUS: `{configured, user, connected, model, error, waitingForPassword, lastOkMs, clients, online, wanDownMbps, wanUpMbps}` (пароль не отдаётся) |
 | POST | `/api/router/credentials` | `{user, password}` — логин и пароль администратора роутера; `password: null` — отключить роутер |
+| GET | `/api/net/speed` | замеры скорости роутером: `{running, results: [{atMs, downMbps, upMbps, pingMs, error}]}` |
+| POST | `/api/net/speed/run` | запустить замер сейчас (202; 409 — уже идёт или роутер не подключён) |
 | GET | `/api/router/debug?hook=…` / `?page=/…` | отладка интеграции: сырой ответ роутера; только с самого телефона (`adb forward`), из Wi-Fi — 403 |
 | GET | `/api/net/devices` | устройства в Wi-Fi: `{devices: [{mac, ip, name, hostname, firstSeenMs, lastSeenMs, known}], learnUntilMs, lastScanMs}` (опрос /24 раз в 5 мин, ARP; первые сутки — обучение) |
 | POST/DELETE | `/api/net/devices/{mac}` | `{name?, known?}` — имя и «своё»; DELETE — забыть устройство |
@@ -64,6 +66,12 @@ powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 ### Telegram-бот
 
 Команды принимаются long polling (`getUpdates`). Владелец — чат из настроек хаба; другим чатам доступ открывает владелец (`/allow ID Имя_профиля`), список — `bot.json`.
-- `/status`, `/progress`, `/week`, `/help` — всем, у кого есть доступ; `/charge 100` (50–100, шаг 5, можно номер станции), `/allow`, `/deny`, `/me`, `/chats` — владельцу.
+- `/status`, `/progress`, `/week`, `/help` — всем, у кого есть доступ; `/charge 100` (50–100, шаг 5, можно номер станции), `/speedtest`, `/allow`, `/deny`, `/me`, `/chats` — владельцу.
 - Понедельник 09:00 — отчёт за прошлую неделю: владельцу — дом (свет, станции, интернет, тренировки всех), каждому привязанному чату — его дорожка.
 - 19:00 — напоминания о незаработанных наградах: недельные — в чт и сб, месячные — за 7, 3 и 1 день до конца месяца.
+
+### Роутер ASUS
+
+Вход как приложение ASUS Router (`login.cgi` → `asus_token`, User-Agent `asusrouter--DUTUtil-`), данные — `appGet.cgi?hook=…`: `get_clientlist()`, `netdev(appobj)`, `nvram_get(productid)`.
+Замер скорости — встроенный Ookla: `ookla_speedtest_exe.cgi` → опрос `ookla_speedtest_get_result()` до записи `type=result` (полоса в байтах/с) → `ookla_speedtest_write_history.cgi`, чтобы замер был и в истории роутера. По расписанию — 7:00 и 21:00, во время тренировки откладывается; скорость ниже половины медианы 10 прошлых замеров — сообщение в Telegram.
+Wi-Fi станций Fossibot (ESP32) узнаётся по MAC = Bluetooth-адрес − 2 и подписывается именем станции.

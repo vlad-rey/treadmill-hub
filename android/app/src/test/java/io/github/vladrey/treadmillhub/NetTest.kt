@@ -76,4 +76,13 @@ class NetTest {
         assertNull(list[1].vendor)
         assertEquals("da:11:22:33:44:55", list[1].mac)
     }
+
+    @Test fun ooklaResultParsing() {
+        val r = io.github.vladrey.treadmillhub.router.RouterSpeed.parseResult(
+            """{"type":"result","timestamp":"2026-09-26T04:00:12Z","ping":{"jitter":0.4,"latency":3.62},
+               "download":{"bandwidth":117250000,"bytes":1},"upload":{"bandwidth":62500000},"packetLoss":0,"result":{"id":"abc"}}""", 1L)
+        assertEquals(938.0, r.downMbps!!, 1e-9)
+        assertEquals(500.0, r.upMbps!!, 1e-9)
+        assertEquals(4, r.pingMs)
+    }
 }

@@ -126,6 +126,7 @@ class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.sys
             "/progress" -> reply(chatId, progress(chatId))
             "/week" -> reply(chatId, weekSoFar(chatId))
             "/charge", "/charge100", "/charge80" -> if (owner) charge(chatId, cmd, args) else reply(chatId, "Эта команда только для владельца.")
+            "/speedtest" -> if (owner) speedtest(chatId) else reply(chatId, "Эта команда только для владельца.")
             "/allow" -> if (owner) allow(chatId, args) else reply(chatId, "Эта команда только для владельца.")
             "/deny" -> if (owner) deny(chatId, args) else reply(chatId, "Эта команда только для владельца.")
             "/me" -> if (owner) linkSelf(chatId, name, username, args) else reply(chatId, "Эта команда только для владельца.")
@@ -136,7 +137,7 @@ class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.sys
 
     private fun help(owner: Boolean) = buildString {
         append("Команды:\n/status — свет, станции, интернет, дорожка\n/progress — сколько осталось до наград\n/week — итоги текущей недели")
-        if (owner) append("\n\nВладельцу:\n/charge 100 — заряжать станции до 100 % (/charge 80, /charge 90 2 — только станция 2)\n" +
+        if (owner) append("\n\nВладельцу:\n/charge 100 — заряжать станции до 100 % (/charge 80, /charge 90 2 — только станция 2)\n/speedtest — замер скорости интернета роутером\n" +
             "/allow ID Имя — открыть доступ чату и привязать профиль дорожки\n/deny ID — закрыть доступ\n" +
             "/me Имя — привязать этот чат к своему профилю дорожки\n/chats — кто пользуется ботом")
         append("\n\nСами приходят: отчёт за неделю — в понедельник в 9:00, напоминания о наградах — в 19:00.")
@@ -183,6 +184,14 @@ class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.sys
     private fun findProfile(name: String) = name.trim().takeIf { it.isNotEmpty() }?.let { n ->
         hub.profiles.all().firstOrNull { it.name.equals(n, ignoreCase = true) }
             ?: hub.profiles.all().filter { it.name.startsWith(n, ignoreCase = true) }.singleOrNull()
+    }
+
+    private fun speedtest(chatId: String) {
+        val started = hub.runSpeedTest { r ->
+            reply(chatId, r.error?.let { "⚠️ Замер не удался: $it" }
+                ?: "🚀 Скорость интернета (замер роутера): ${reports.num(r.downMbps ?: 0.0, 0)} ↓ / ${reports.num(r.upMbps ?: 0.0, 0)} ↑ Мбит/с, пинг ${r.pingMs ?: "?"} мс")
+        }
+        reply(chatId, if (started) "Запустил замер на роутере, это около минуты…" else "Не могу: " + if (hub.speed.running) "замер уже идёт." else "роутер не подключён.")
     }
 
     private fun chatsText(): String {
@@ -276,7 +285,7 @@ class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.sys
             hub.power.configs().map { StationWeek(it.name, hub.power.statsStore.range(it.id, from, to)) },
             hub.power.outages.all().filter { it.startMs in start until end },
             hub.net.outages(500).filter { it.startMs in start until end },
-            emptyList(),
+            hub.speed.all().filter { it.atMs in start until end },
             hub.profiles.all().map { profileWeek(it.id, from, to) },
         )
     }

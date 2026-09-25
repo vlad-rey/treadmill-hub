@@ -69,10 +69,10 @@ class AsusRouter(private val host: String, private val user: String, private val
         return http(path, null)
     }
 
-    /** Команда `apply.cgi` (например, запуск встроенного замера скорости). */
-    fun apply(params: Map<String, String>): Pair<Int, String> {
+    /** POST формы на CGI роутера (например, запуск встроенного замера скорости). */
+    fun post(path: String, params: Map<String, String>): Pair<Int, String> {
         if (token == null) login()
-        return http("/apply.cgi", params.entries.joinToString("&") { (k, v) -> "$k=${URLEncoder.encode(v, "UTF-8")}" })
+        return http(path, params.entries.joinToString("&") { (k, v) -> "$k=${URLEncoder.encode(v, "UTF-8")}" })
     }
 
     fun clients(): List<RouterClient> = parseClients(hook("get_clientlist();")["get_clientlist"] as? JsonObject)

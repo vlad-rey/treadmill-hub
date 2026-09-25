@@ -14,7 +14,9 @@ import io.github.vladrey.treadmillhub.net.DeviceWatch
 import io.github.vladrey.treadmillhub.net.NetState
 import io.github.vladrey.treadmillhub.net.NetWatch
 import io.github.vladrey.treadmillhub.power.PowerHub
+import io.github.vladrey.treadmillhub.router.RouterSpeed
 import io.github.vladrey.treadmillhub.router.RouterWatch
+import io.github.vladrey.treadmillhub.net.SpeedResult
 import io.github.vladrey.treadmillhub.program.BuiltinPrograms
 import io.github.vladrey.treadmillhub.program.RunState
 import io.github.vladrey.treadmillhub.program.ProgramRunner
@@ -40,6 +42,7 @@ import io.github.vladrey.treadmillhub.treadmill.SimulatorBackend
 import io.github.vladrey.treadmillhub.treadmill.TreadmillBackend
 import io.github.vladrey.treadmillhub.treadmill.TreadmillState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -111,7 +114,9 @@ class Hub(private val context: Context, val config: HubConfig) {
     val power = PowerHub(context, context.filesDir, telegram)
     val net = NetWatch(context, context.filesDir, telegram)
     val router = RouterWatch(config, host = { net.gateway() })
-    val devices = DeviceWatch(context, context.filesDir, telegram, router)
+    val devices = DeviceWatch(context, context.filesDir, telegram, router, stations = { power.configs().associate { it.address.lowercase() to it.name } })
+    val speed = RouterSpeed(router, context.filesDir, onResult = ::onSpeedResult)
+    private lateinit var scope: CoroutineScope
     val bot = Bot(this, context.filesDir)
     private val programsDone = mutableListOf<String>()
     private var lastDoneRunner: ProgramRunner? = null
@@ -139,7 +144,9 @@ class Hub(private val context: Context, val config: HubConfig) {
         backend.start(scope)
         power.start(scope)
         net.start(scope)
+        this.scope = scope
         router.start(scope)
+        speed.start(scope, busy = { tracker.current.active })
         devices.start(scope)
         telegram.start(scope)
         bot.start(scope)
@@ -320,6 +327,23 @@ class Hub(private val context: Context, val config: HubConfig) {
 
     private val mem get() = android.app.ActivityManager.MemoryInfo().also {
         context.getSystemService(android.app.ActivityManager::class.java).getMemoryInfo(it)
+    }
+
+    /** Замер скорости по кнопке или команде бота; [done] — после окончания. */
+    fun runSpeedTest(done: (SpeedResult) -> Unit = {}): Boolean {
+        if (speed.running || !router.status.connected) return false
+        scope.launch(Dispatchers.IO) { done(speed.run()) }
+        return true
+    }
+
+    /** Скорость заметно ниже обычной (меньше половины медианы 10 прошлых замеров) — сообщение владельцу. */
+    private fun onSpeedResult(r: SpeedResult) {
+        val down = r.downMbps ?: return
+        val prev = speed.all().dropLast(1).mapNotNull { it.downMbps }.takeLast(10)
+        if (prev.size < 3) return
+        val median = prev.sorted()[prev.size / 2]
+        if (down < median / 2) telegram.send(scope, "🐢 Скорость интернета упала: ${down.roundToInt()} ↓ / ${r.upMbps?.roundToInt() ?: "?"} ↑ Мбит/с, " +
+            "обычно около ${median.roundToInt()} ↓. Замер роутера в ${java.text.SimpleDateFormat("HH:mm").format(java.util.Date(r.atMs))}.")
     }
 
     fun refreshCelebrations() { _snapshot.value = _snapshot.value.copy(celebrations = game.store.pending()) }

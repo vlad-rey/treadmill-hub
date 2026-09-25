@@ -70,6 +70,45 @@ $("routerCreds").addEventListener("submit", (e) => {
 });
 $("rtClear").onclick = () => { if (confirm("Отключить роутер? Хаб забудет пароль.")) saveRouter(null); };
 
+// --- Скорость интернета: замеры роутера --------------------------------------------------
+const f0 = (v) => v == null ? "—" : Math.round(v).toLocaleString("ru-RU");
+let speedPoll = 0;
+async function loadSpeed() {
+  try {
+    const d = await (await fetch("/api/net/speed")).json();
+    const ok = d.results.filter((r) => r.downMbps != null);
+    const last = d.results[d.results.length - 1];
+    const week = ok.filter((r) => Date.now() - r.atMs < 7 * 86400e3);
+    const avg = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+    $("speedCards").innerHTML = [
+      card("Приём", last && last.downMbps != null ? `${f0(last.downMbps)} Мбит/с` : "—", last ? (last.error ? "ошибка: " + esc(last.error) : clock(last.atMs)) : "замеров ещё не было"),
+      card("Отдача", last && last.upMbps != null ? `${f0(last.upMbps)} Мбит/с` : "—", last && last.pingMs != null ? `пинг ${last.pingMs} мс` : ""),
+      card("Среднее за неделю", week.length ? `${f0(avg(week.map((r) => r.downMbps)))} ↓` : "—", week.length ? `${f0(avg(week.map((r) => r.upMbps).filter((v) => v != null)))} ↑ · замеров ${week.length}` : ""),
+      card("Минимум за неделю", week.length ? `${f0(Math.min(...week.map((r) => r.downMbps)))} ↓` : "—", ""),
+    ].join("");
+    drawSpeed(ok.slice(-60));
+    $("speedRun").disabled = d.running;
+    $("speedRun").textContent = d.running ? "Идёт замер… (около минуты)" : "Замерить сейчас";
+    clearTimeout(speedPoll);
+    if (d.running) speedPoll = setTimeout(loadSpeed, 4000);
+  } catch (_) { /* нет связи с хабом */ }
+}
+function drawSpeed(list) {
+  const svg = $("speedChart");
+  if (list.length < 2) { svg.innerHTML = `<text x="500" y="105" text-anchor="middle" class="chartEmpty">график появится после двух замеров</text>`; $("speedRange").textContent = ""; return; }
+  const max = Math.max(...list.map((r) => Math.max(r.downMbps, r.upMbps || 0))) * 1.1;
+  const x = (i) => (i / (list.length - 1)) * 1000, y = (v) => 195 - (v / max) * 185;
+  const line = (k) => list.map((r, i) => r[k] == null ? "" : `${i ? "L" : "M"}${x(i).toFixed(1)},${y(r[k]).toFixed(1)}`).join(" ");
+  const grid = [0.25, 0.5, 0.75].map((f) => `<line class="grid" x1="0" x2="1000" y1="${y(max * f)}" y2="${y(max * f)}"/><text class="gridLbl" x="4" y="${y(max * f) - 4}">${Math.round(max * f)}</text>`).join("");
+  svg.innerHTML = grid + `<path class="spDown" d="${line("downMbps")}"/><path class="spUp" d="${line("upMbps")}"/>`;
+  $("speedRange").textContent = `${clock(list[0].atMs)} – ${clock(list[list.length - 1].atMs)}, Мбит/с`;
+}
+$("speedRun").onclick = async () => {
+  const r = await fetch("/api/net/speed/run", { method: "POST" });
+  if (!r.ok) alert((await r.json()).error || "не удалось");
+  loadSpeed();
+};
+
 // --- Устройства в Wi-Fi: хаб опрашивает сеть раз в 5 мин; новое незнакомое — сообщение в Telegram ---
 const isRandom = (mac) => (parseInt(mac.slice(0, 2), 16) & 2) === 2;
 function seen(ms) {
@@ -129,6 +168,8 @@ load();
 loadLog();
 loadDevices();
 loadRouter();
+loadSpeed();
+setInterval(loadSpeed, 60e3);
 setInterval(loadDevices, 60e3);
 setInterval(loadRouter, 30e3);
 setInterval(load, 5e3);

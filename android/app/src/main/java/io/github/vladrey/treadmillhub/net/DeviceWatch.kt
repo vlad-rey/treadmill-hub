@@ -95,6 +95,16 @@ class DeviceRegistry(private val file: File, private val learnMs: Long = 24 * 36
         save()
     }
 
+    /** Устройства без имени, чей MAC на 2 меньше Bluetooth-адреса станции, — Wi-Fi этой станции. */
+    @Synchronized
+    fun nameStations(ble: Map<String, String>) {
+        if (ble.isEmpty()) return
+        val byWifi = ble.mapNotNull { (addr, name) -> wifiMacOfBle(addr)?.let { it to name } }.toMap()
+        if (data.devices.none { it.name == null && it.mac in byWifi }) return
+        data = data.copy(devices = data.devices.map { d -> byWifi[d.mac]?.takeIf { d.name == null }?.let { d.copy(name = "⚡ $it", known = true) } ?: d })
+        save()
+    }
+
     @Synchronized
     fun patch(mac: String, p: DevicePatch): NetDevice? {
         val m = mac.lowercase()
@@ -122,6 +132,12 @@ class DeviceRegistry(private val file: File, private val learnMs: Long = 24 * 36
     }
 
     companion object {
+        /** ESP32: Wi-Fi MAC = Bluetooth MAC − 2. */
+        fun wifiMacOfBle(ble: String): String? {
+            val v = ble.replace(":", "").toLongOrNull(16) ?: return null
+            return String.format("%012x", v - 2).chunked(2).joinToString(":")
+        }
+
         /** Разбор /proc/net/arp: только полные записи (флаг 0x2) на [iface]. */
         fun parseArp(text: String, iface: String = "wlan0"): List<Pair<String, String>> = text.lines().drop(1).mapNotNull { line ->
             val f = line.trim().split(Regex("\\s+"))
@@ -138,6 +154,8 @@ class DeviceRegistry(private val file: File, private val learnMs: Long = 24 * 36
  */
 class DeviceWatch(
     private val context: Context, dir: File, private val telegram: Telegram, private val router: RouterWatch,
+    /** Bluetooth-адрес станции → её имя: Wi-Fi-модуль станции (ESP32) узнаём по MAC = Bluetooth − 2. */
+    private val stations: () -> Map<String, String> = { emptyMap() },
     private val intervalMs: Long = 5 * 60_000L,
 ) {
     val registry = DeviceRegistry(File(dir, "devices.json"))
@@ -173,6 +191,7 @@ class DeviceWatch(
         val now = System.currentTimeMillis()
         val fresh = registry.seen(seen, now)
         if (fromRouter.isNotEmpty()) registry.setInfo(fromRouter.associateBy { it.mac })
+        registry.nameStations(stations())
         lastScanMs = now
         // Имена от роутера (DHCP) — для новых и ещё безымянных устройств
         registry.all().filter { it.hostname == null && it.lastSeenMs == now }.take(8).forEach { d ->

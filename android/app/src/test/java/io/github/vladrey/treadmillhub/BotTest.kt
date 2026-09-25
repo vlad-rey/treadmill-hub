@@ -114,6 +114,20 @@ class BotTest {
         file.delete()
     }
 
+    @Test fun stationWifiIsNamedByBluetoothAddress() {
+        assertEquals("e8:f6:0a:05:87:f4", DeviceRegistry.wifiMacOfBle("E8:F6:0A:05:87:F6"))
+        assertEquals("14:c1:9f:a1:1b:fe", DeviceRegistry.wifiMacOfBle("14:C1:9F:A1:1C:00")) // перенос через байт
+        val file = File.createTempFile("devices", ".json").apply { delete() }
+        val reg = DeviceRegistry(file, learnMs = 0)
+        reg.seen(listOf("192.168.50.18" to "e8:f6:0a:05:87:f4", "192.168.50.5" to "04:00:00:00:00:05"), 10)
+        reg.nameStations(mapOf("e8:f6:0a:05:87:f6" to "Станция 1"))
+        val st = reg.all().first { it.mac == "e8:f6:0a:05:87:f4" }
+        assertEquals("⚡ Станция 1", st.name)
+        assertTrue(st.known)
+        assertNull(reg.all().first { it.mac == "04:00:00:00:00:05" }.name)
+        file.delete()
+    }
+
     @Test fun arpParsing() {
         val arp = """IP address       HW type     Flags       HW address            Mask     Device
 192.168.50.1     0x1         0x2         04:42:1a:00:00:01     *        wlan0

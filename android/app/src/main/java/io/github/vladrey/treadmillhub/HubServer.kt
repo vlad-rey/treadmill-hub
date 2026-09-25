@@ -6,6 +6,7 @@ import io.ktor.http.HttpStatusCode
 import io.github.vladrey.treadmillhub.gamification.RewardDef
 import io.github.vladrey.treadmillhub.net.DevicePatch
 import io.github.vladrey.treadmillhub.net.NetDevice
+import io.github.vladrey.treadmillhub.net.SpeedResult
 import io.github.vladrey.treadmillhub.power.StationConfig
 import io.github.vladrey.treadmillhub.program.CustomProgramInput
 import io.github.vladrey.treadmillhub.program.ProgramInfo
@@ -43,6 +44,9 @@ private data class ProfileRef(val profileId: String? = null)
 
 @Serializable
 private data class DeliveredInput(val delivered: Boolean = true)
+
+@Serializable
+private data class SpeedDto(val running: Boolean, val results: List<SpeedResult>)
 
 @Serializable
 private data class RouterCredentials(val user: String = "admin", val password: String? = null)
@@ -101,6 +105,11 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                     } ?: "роутер не настроен"
                 }
                 call.respondText(r.getOrElse { "ошибка: ${it.message}" })
+            }
+            get("/api/net/speed") { call.respondJson(json.encodeToString(SpeedDto(hub.speed.running, hub.speed.all().takeLast(400)))) }
+            post("/api/net/speed/run") {
+                if (hub.runSpeedTest()) call.respondJson("""{"started":true}""", HttpStatusCode.Accepted)
+                else call.respondJson("""{"error":"${if (hub.speed.running) "замер уже идёт" else "роутер не подключён"}"}""", HttpStatusCode.Conflict)
             }
             get("/api/net/devices") {
                 call.respondJson(json.encodeToString(DevicesDto(hub.devices.registry.all(), hub.devices.registry.learnUntilMs(), hub.devices.lastScanMs)))

@@ -20,3 +20,12 @@ body.page h3 { margin: 18px 2px 8px; font-size: 14px; font-weight: 500; color: v
 .routerForm label { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; color: var(--muted); font-size: 14px; }
 .routerForm input { font: inherit; font-size: 16px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
 .routerForm .grid2 { margin-top: 10px; }
+
+.speedBox { display: flex; flex-direction: column; gap: 8px; }
+.speedChart { width: 100%; height: 160px; background: var(--card); border-radius: 14px; }
+.speedChart .spDown { fill: none; stroke: #2fbf71; stroke-width: 3; vector-effect: non-scaling-stroke; }
+.speedChart .spUp { fill: none; stroke: #3fb6ff; stroke-width: 3; vector-effect: non-scaling-stroke; }
+.speedChart .grid { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.speedChart .gridLbl, .speedChart .chartEmpty { fill: var(--muted); font-size: 22px; }
+.speedLegend { display: flex; gap: 14px; font-size: 13px; flex-wrap: wrap; }
+.lgDown { color: #2fbf71; } .lgUp { color: #3fb6ff; }
