@@ -154,6 +154,7 @@ class Hub(private val context: Context, val config: HubConfig) {
     }
 
     private fun save(session: SessionStats) {
+        if (backend.name == "sim") return // симулятор — только для проверок, в историю не пишем
         val id = session.startedAtMs ?: return
         runCatching { history.save(SavedSession(id, weightOf(owner), session, samples.toList(), profileId = owner)) }
             .onFailure { android.util.Log.w("Hub", "не удалось сохранить тренировку: ${it.message}") }

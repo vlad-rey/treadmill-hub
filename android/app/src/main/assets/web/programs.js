@@ -231,7 +231,8 @@ $("edSave").onclick = async () => {
 const fmtDate = (ms) => new Date(ms).toLocaleString("ru-RU", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const sessionRow = (s, claim) => `<div class="row"><span class="grow"><b>${fmtDate(s.id)}</b>
   <small>${fmtTime(s.movingS)} · ${(s.distanceM / 1000).toFixed(2)} км · ${Math.round(s.kcalCalc)} ккал (дорожка ${s.kcalTreadmill == null ? "—" : Math.round(s.kcalTreadmill)})</small></span>
-  ${claim ? `<button type="button" class="btn" data-claim="${s.id}">Это моя</button>` : ""}</div>`;
+  ${claim ? `<button type="button" class="btn" data-claim="${s.id}">Это моя</button>` : ""}
+  <button type="button" class="x" data-del="${s.id}" aria-label="Удалить тренировку">×</button></div>`;
 
 async function loadHistory() {
   if (!me) return;
@@ -244,6 +245,15 @@ async function loadHistory() {
   $("orphanList").innerHTML = orphans.slice(0, 30).map((s) => sessionRow(s, true)).join("");
 }
 window.loadHistory = loadHistory;
+
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-del]");
+  if (!b) return;
+  if (!confirm("Удалить эту тренировку из истории? Отменить нельзя.")) return;
+  await fetch("/api/sessions/" + b.dataset.del, { method: "DELETE" });
+  loadHistory();
+  loadStats();
+});
 
 $("orphanList").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-claim]");

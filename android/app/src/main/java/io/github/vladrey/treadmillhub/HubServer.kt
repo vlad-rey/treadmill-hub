@@ -113,6 +113,10 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                 val list = hub.history.list().let { all -> if (profile == null) all else all.filter { it.profileId == profile.ifBlank { null } } }
                 call.respondJson(json.encodeToString(list))
             }
+            delete("/api/sessions/{id}") {
+                val ok = call.parameters["id"]?.toLongOrNull()?.let(hub.history::delete) == true
+                call.respondJson("""{"ok":$ok}""", if (ok) HttpStatusCode.OK else HttpStatusCode.NotFound)
+            }
             post("/api/sessions/{id}/profile") {
                 val id = call.parameters["id"]?.toLongOrNull()
                 val body = runCatching { json.decodeFromString<ProfileRef>(call.receiveText()) }.getOrNull()

@@ -77,6 +77,12 @@ class HistoryStore(private val dir: File) {
     fun list(): List<SessionSummary> = summaries.values.sortedByDescending { it.id }
 
     @Synchronized
+    fun delete(id: Long): Boolean {
+        summaries.remove(id)
+        return file(id).delete()
+    }
+
+    @Synchronized
     fun setProfile(id: Long, profileId: String?): Boolean {
         val s = load(id) ?: return false
         save(s.copy(profileId = profileId))
