@@ -5,7 +5,12 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.SystemClock
+import io.github.vladrey.treadmillhub.gamification.Celebration
+import io.github.vladrey.treadmillhub.gamification.Game
+import io.github.vladrey.treadmillhub.gamification.MetricsCalc
+import io.github.vladrey.treadmillhub.gamification.Telegram
 import io.github.vladrey.treadmillhub.program.BuiltinPrograms
+import io.github.vladrey.treadmillhub.program.RunState
 import io.github.vladrey.treadmillhub.program.ProgramRunner
 import io.github.vladrey.treadmillhub.program.ProgramStatus
 import io.github.vladrey.treadmillhub.program.ProgramStore
@@ -68,6 +73,8 @@ data class Snapshot(
     val ownerProfileId: String? = null,
     val ownerName: String? = null,
     val program: ProgramStatus? = null,
+    /** Окна наград/ачивок, ещё не подтверждённые на телефоне владельца (клиент фильтрует по своему профилю). */
+    val celebrations: List<Celebration> = emptyList(),
 )
 
 @Serializable
@@ -91,6 +98,11 @@ class Hub(private val context: Context, val config: HubConfig) {
     val programs = ProgramStore(File(context.filesDir, "programs.json"))
     @Volatile private var runner: ProgramRunner? = null
     val history = HistoryStore(File(context.filesDir, "sessions"))
+    lateinit var game: Game
+        private set
+    private val programsDone = mutableListOf<String>()
+    private var lastDoneRunner: ProgramRunner? = null
+    private var lastLiveCheckMs = 0L
 
     /** Кто нажал СТАРТ — станет владельцем следующей тренировки. */
     @Volatile private var nextOwner: String? = null
@@ -105,6 +117,10 @@ class Hub(private val context: Context, val config: HubConfig) {
     val snapshot = _snapshot.asStateFlow()
 
     fun start(scope: CoroutineScope) {
+        game = Game(context.filesDir, history, weights, profiles, Telegram({ config.telegramToken }, { config.telegramChatId }), scope) {
+            _snapshot.value = _snapshot.value.copy(celebrations = game.store.pending())
+        }
+        _snapshot.value = _snapshot.value.copy(celebrations = game.store.pending())
         backend.start(scope)
         scope.launch {
             backend.state.collect { s ->
@@ -132,6 +148,11 @@ class Hub(private val context: Context, val config: HubConfig) {
                     val res = backend.command(cmd)
                     if (!res.ok) android.util.Log.w("Hub", "программа: $cmd — ${res.message}")
                 }
+                // Программа пройдена до конца — для ачивок «По плану», «Отличник», «Сам себе тренер»
+                if (r.state == RunState.DONE && r !== lastDoneRunner && tracker.current.active) {
+                    lastDoneRunner = r
+                    programsDone += r.id
+                }
                 _snapshot.value = _snapshot.value.copy(program = r.status())
             }
         }
@@ -147,6 +168,7 @@ class Hub(private val context: Context, val config: HubConfig) {
         if (session.active) {
             if (!wasActive) {
                 samples.clear(); lastSampleMs = 0; lastSaveMs = now
+                programsDone.clear()
                 owner = nextOwner
                 nextOwner = null
             }
@@ -155,8 +177,14 @@ class Hub(private val context: Context, val config: HubConfig) {
                 lastSampleMs = now
             }
             if (now - lastSaveMs >= 60_000) { save(session); lastSaveMs = now }
+            // Реальные награды — в момент достижения, прямо во время тренировки
+            if (now - lastLiveCheckMs >= 5_000 && backend.name != "sim") {
+                lastLiveCheckMs = now
+                runCatching { game.liveCheck(owner, session.startedAtMs, session.distanceM) }
+            }
         } else if (wasActive) {
             save(session)
+            if (backend.name != "sim") runCatching { game.evaluate(owner) }
             // Тренировка закрыта — убираем завершённую программу с экрана
             if (runner?.finished == true) {
                 runner = null
@@ -168,7 +196,10 @@ class Hub(private val context: Context, val config: HubConfig) {
     private fun save(session: SessionStats) {
         if (backend.name == "sim") return // симулятор — только для проверок, в историю не пишем
         val id = session.startedAtMs ?: return
-        runCatching { history.save(SavedSession(id, weightOf(owner), session, samples.toList(), profileId = owner)) }
+        runCatching {
+            val base = SavedSession(id, weightOf(owner), session, samples.toList(), profileId = owner, programsDone = programsDone.toList())
+            history.save(base.copy(metrics = MetricsCalc.of(base, base.programsDone)))
+        }
             .onFailure { android.util.Log.w("Hub", "не удалось сохранить тренировку: ${it.message}") }
     }
 
@@ -191,6 +222,7 @@ class Hub(private val context: Context, val config: HubConfig) {
                 return CommandResult(true, "программа завершена, ручной режим")
             }
             "stop" -> {
+                if (s.phase == Phase.COUNTDOWN) runCatching { game.event(req.profileId ?: nextOwner ?: owner, "changed_mind") }
                 runner?.cancel()
                 Command.Stop
             }
@@ -266,6 +298,8 @@ class Hub(private val context: Context, val config: HubConfig) {
     private val mem get() = android.app.ActivityManager.MemoryInfo().also {
         context.getSystemService(android.app.ActivityManager::class.java).getMemoryInfo(it)
     }
+
+    fun refreshCelebrations() { _snapshot.value = _snapshot.value.copy(celebrations = game.store.pending()) }
 
     /** Отметка от скрипта бэкапа на PC (redmi6-homeserver/tools/backup-hub-data.ps1). */
     fun markBackup() {

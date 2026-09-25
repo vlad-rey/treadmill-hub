@@ -1,5 +1,7 @@
 package io.github.vladrey.treadmillhub.session
 
+import io.github.vladrey.treadmillhub.gamification.MetricsCalc
+import io.github.vladrey.treadmillhub.gamification.SessionMetrics
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -31,6 +33,9 @@ data class SavedSession(
     val console: ConsoleReading? = null,
     /** Кто тренировался; null — запуск с пульта дорожки, можно переназначить. */
     val profileId: String? = null,
+    /** Программы, пройденные до конца в этой тренировке. */
+    val programsDone: List<String> = emptyList(),
+    val metrics: SessionMetrics? = null,
 )
 
 @Serializable
@@ -42,10 +47,11 @@ data class SessionSummary(
     val kcalTreadmill: Double?,
     val console: ConsoleReading?,
     val profileId: String?,
+    val metrics: SessionMetrics? = null,
 )
 
 private fun SavedSession.summary() =
-    SessionSummary(id, stats.movingS, stats.distanceM, stats.kcalCalc, stats.kcalTreadmill, console, profileId)
+    SessionSummary(id, stats.movingS, stats.distanceM, stats.kcalCalc, stats.kcalTreadmill, console, profileId, metrics ?: MetricsCalc.of(this, programsDone))
 
 /**
  * История тренировок: по файлу JSON на тренировку (с посекундными сэмплами), хранится бессрочно —

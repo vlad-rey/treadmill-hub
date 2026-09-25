@@ -3,6 +3,7 @@ package io.github.vladrey.treadmillhub
 import android.content.res.AssetManager
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.github.vladrey.treadmillhub.gamification.RewardDef
 import io.github.vladrey.treadmillhub.program.CustomProgramInput
 import io.github.vladrey.treadmillhub.program.ProgramInfo
 import io.github.vladrey.treadmillhub.session.ConsoleReading
@@ -33,6 +34,9 @@ private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
 @Serializable
 private data class ProfileRef(val profileId: String? = null)
+
+@Serializable
+private data class DeliveredInput(val delivered: Boolean = true)
 
 /** HTTP + WebSocket API хаба и статика веб-интерфейса из assets/web. */
 class HubServer(private val hub: Hub, private val assets: AssetManager, port: Int) {
@@ -91,9 +95,36 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                 val r = runCatching {
                     val kg = json.decodeFromString<WeightInput>(call.receiveText()).kg
                     requireNotNull(hub.profiles.update(id, ProfilePatch(weightKg = kg))) { "профиль не найден" }
-                    hub.weights.add(id, kg)
+                    hub.weights.add(id, kg).also { hub.game.evaluate(id) }
                 }
                 r.fold({ call.respondJson(json.encodeToString(it)) }, { call.respondError(it) })
+            }
+
+            // Геймификация: ачивки и реальные награды профиля (свои — видит и владелец хаба)
+            get("/api/game/{profileId}") {
+                val id = call.parameters["profileId"].orEmpty()
+                if (hub.profiles.get(id) == null) call.respondJson("""{"error":"профиль не найден"}""", HttpStatusCode.NotFound)
+                else call.respondJson(json.encodeToString(hub.game.state(id)))
+            }
+            post("/api/game/{profileId}/rewards") {
+                val id = call.parameters["profileId"].orEmpty()
+                val r = runCatching {
+                    requireNotNull(hub.profiles.get(id)) { "профиль не найден" }
+                    val defs = json.decodeFromString<List<RewardDef>>(call.receiveText()).map { it.copy(profileId = id) }
+                    hub.game.store.setRewards(id, defs)
+                    hub.game.state(id)
+                }
+                r.fold({ call.respondJson(json.encodeToString(it)) }, { call.respondError(it) })
+            }
+            post("/api/game/celebrations/{id}/ack") {
+                hub.game.store.ack(call.parameters["id"].orEmpty())
+                hub.refreshCelebrations()
+                call.respondJson("""{"ok":true}""")
+            }
+            post("/api/game/rewards/{rewardId}/{periodKey}/delivered") {
+                val body = runCatching { json.decodeFromString<DeliveredInput>(call.receiveText()) }.getOrNull() ?: DeliveredInput(true)
+                val ok = hub.game.store.setDelivered(call.parameters["rewardId"].orEmpty(), call.parameters["periodKey"].orEmpty(), body.delivered)
+                call.respondJson("""{"ok":$ok}""", if (ok) HttpStatusCode.OK else HttpStatusCode.NotFound)
             }
 
             // Программы: встроенные P1–P8 и свои (свои — общие и профиля)

@@ -9,6 +9,7 @@ function showTab(name) {
   if (name === "programs") loadPrograms();
   if (name === "history") { loadHistory(); loadWeights(); }
   if (name === "hub" && lastSnap) window.renderHub(lastSnap);
+  if (name === "awards" && window.loadAwards) window.loadAwards();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => showTab(b.dataset.tab)));

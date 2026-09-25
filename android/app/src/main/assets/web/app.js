@@ -112,6 +112,7 @@ function render(snap) {
   if (window.renderProgram) window.renderProgram(snap.program);
   lastSnap = snap;
   if (window.renderHub) window.renderHub(snap);
+  if (window.onCelebrations) window.onCelebrations(snap.celebrations || []);
 
   $("bucketRows").innerHTML = (s.buckets || [])
     .filter((b) => b.seconds >= 1)

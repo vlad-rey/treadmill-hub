@@ -90,7 +90,52 @@ button { font: inherit; color: var(--text); touch-action: manipulation; }
 .step .x { height: 40px; background: none; border: 0; color: var(--muted); font-size: 20px; }
 .wideDlg { width: min(96vw, 560px); }
 
-.tabs { grid-template-columns: repeat(4, 1fr); }
+.tabs { grid-template-columns: repeat(5, 1fr); }
+.tabs button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; }
+.tabs .ti { font-size: 18px; line-height: 1; }
+.tabs .tl { font-size: 11px; }
+@media (min-width: 900px) { .tabs { max-width: 1000px; } .tabs .ti { font-size: 22px; } .tabs .tl { font-size: 16px; } }
+
+/* --- Награды --- */
+.rewardCard { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px; margin-bottom: var(--gap); }
+.rewardCard.earned { border-color: #d4a72c; box-shadow: 0 0 18px rgba(255, 196, 0, .25); }
+.rewardCard .rIcon { font-size: 40px; width: 56px; text-align: center; }
+.rewardCard .grow { flex: 1; min-width: 0; }
+.rewardCard b { font-size: 17px; }
+.rewardCard small { color: var(--muted); font-size: 13px; display: block; }
+.bar { height: 10px; background: #0d1115; border-radius: 99px; overflow: hidden; margin: 6px 0 2px; }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, #2fbf71, #9be15d); border-radius: 99px; }
+.rewardCard.earned .bar i { background: linear-gradient(90deg, #f7b733, #ffd86b); }
+.achGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--gap); }
+.ach { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 6px; text-align: center; position: relative; }
+.ach .aIcon { width: 58px; height: 58px; margin: 0 auto 6px; border-radius: 50%; display: grid; place-items: center; font-size: 30px; border: 3px solid var(--g); background: radial-gradient(circle, #232b34 55%, #151a20); }
+.ach b { display: block; font-size: 13px; line-height: 1.2; }
+.ach small { display: block; color: var(--muted); font-size: 11px; line-height: 1.25; margin-top: 3px; }
+.ach .bar { height: 5px; }
+.ach.locked .aIcon { filter: grayscale(1) brightness(.55); border-color: #3a434d; }
+.ach.locked b { color: var(--muted); }
+.ach.earned .aIcon { box-shadow: 0 0 14px var(--g); }
+.g-BRONZE { --g: #cd7f32; } .g-SILVER { --g: #c9d1d9; } .g-GOLD { --g: #ffcc33; } .g-PLATINUM { --g: #7ff0ff; } .g-LEGEND { --g: #d86bff; }
+.ach.earned.g-LEGEND .aIcon { animation: legend 3s linear infinite; }
+.ach.earned.g-PLATINUM .aIcon { animation: shimmer 2.5s ease-in-out infinite; }
+@keyframes legend { 0% { box-shadow: 0 0 16px #ff5f6d; border-color: #ff5f6d; } 33% { box-shadow: 0 0 22px #ffc371; border-color: #ffc371; } 66% { box-shadow: 0 0 22px #7ff0ff; border-color: #7ff0ff; } 100% { box-shadow: 0 0 16px #d86bff; border-color: #d86bff; } }
+@keyframes shimmer { 50% { box-shadow: 0 0 24px #7ff0ff; } }
+.gradeTag { position: absolute; top: 6px; right: 8px; font-size: 9px; letter-spacing: .5px; color: var(--g); text-transform: uppercase; }
+.deliver { margin-top: 6px; height: 36px !important; font-size: 13px !important; padding: 0 10px !important; }
+
+/* --- Праздник --- */
+/* Ниже нижней панели (z 10): СТОП всегда доступен, даже поверх праздника */
+.celebrate { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; background: rgba(8, 10, 14, .78); backdrop-filter: blur(3px); }
+.celebrate canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.celebrateCard { position: relative; width: min(88vw, 440px); text-align: center; background: #151b22; border: 2px solid #d4a72c; border-radius: 26px; padding: 26px 20px 20px; box-shadow: 0 0 60px rgba(255, 196, 0, .35); animation: pop .5s cubic-bezier(.2, 1.6, .4, 1); }
+.celebrateCard.achievement { border-color: var(--g, #7ff0ff); box-shadow: 0 0 50px var(--g, #7ff0ff); }
+.ceIcon { font-size: 96px; line-height: 1.1; animation: bounce 1.6s ease-in-out infinite; }
+.ceKind { color: #ffd86b; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; margin-top: 6px; }
+.celebrateCard h2 { font-size: 30px; margin: 6px 0; }
+.celebrateCard p { color: #c8d1da; font-size: 17px; margin: 0 0 18px; }
+.celebrateCard .btn { width: 100%; }
+@keyframes pop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes bounce { 50% { transform: translateY(-10px) scale(1.06); } }
 .warn { background: #3a3117; border: 1px solid #5c4d23; color: #ffe2a3; border-radius: 14px; padding: 10px 12px; }
 .warn.bad { background: #3b1a1c; border-color: #6b2a2d; color: #ffd0d2; }
 .warn.ok { background: #16372a; border-color: #235c3d; color: #7ee2ad; }

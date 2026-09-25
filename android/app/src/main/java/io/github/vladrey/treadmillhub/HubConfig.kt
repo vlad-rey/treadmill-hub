@@ -28,22 +28,36 @@ class HubConfig(context: Context) {
 
     val port: Int get() = prefs.getInt("port", 8080)
 
+    /** Telegram: токен бота и chat id владельца. Хранятся только на телефоне. */
+    var telegramToken: String?
+        get() = prefs.getString("telegramToken", null)
+        set(v) = prefs.edit().putString("telegramToken", v).apply()
+    var telegramChatId: String?
+        get() = prefs.getString("telegramChatId", null)
+        set(v) = prefs.edit().putString("telegramChatId", v).apply()
+
     var lastBackupMs: Long?
         get() = prefs.getLong("lastBackupMs", 0L).takeIf { it > 0 }
         set(v) = prefs.edit().putLong("lastBackupMs", v ?: 0L).apply()
 
-    fun toDto() = ConfigDto(deviceAddress, backend, weightKg, maxSpeedKmh)
+    fun toDto() = ConfigDto(deviceAddress, backend, weightKg, maxSpeedKmh, telegramToken != null, telegramChatId)
 
     fun apply(dto: ConfigPatch) {
         dto.deviceAddress?.let { deviceAddress = it.ifBlank { null } }
         dto.backend?.let { require(it == "ftms" || it == "sim") { "backend: ftms или sim" }; backend = it }
         dto.weightKg?.let { require(it in 30.0..250.0) { "вес 30–250 кг" }; weightKg = it }
         dto.maxSpeedKmh?.let { require(it in 1.0..16.0) { "лимит 1–16 км/ч" }; maxSpeedKmh = it }
+        dto.telegramToken?.let { telegramToken = it.ifBlank { null } }
+        dto.telegramChatId?.let { telegramChatId = it.ifBlank { null } }
     }
 }
 
 @Serializable
-data class ConfigDto(val deviceAddress: String?, val backend: String, val weightKg: Double, val maxSpeedKmh: Double)
+data class ConfigDto(
+    val deviceAddress: String?, val backend: String, val weightKg: Double, val maxSpeedKmh: Double,
+    /** Сам токен наружу не отдаём — только признак, что он задан. */
+    val telegramConfigured: Boolean = false, val telegramChatId: String? = null,
+)
 
 @Serializable
 data class ConfigPatch(
@@ -51,4 +65,6 @@ data class ConfigPatch(
     val backend: String? = null,
     val weightKg: Double? = null,
     val maxSpeedKmh: Double? = null,
+    val telegramToken: String? = null,
+    val telegramChatId: String? = null,
 )
