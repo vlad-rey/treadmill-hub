@@ -1,5 +1,5 @@
-"""Иконка приложения: крыша дома (хаб), молния (станции), зелёная полоса (лента дорожки).
-Пишет favicon.svg и PNG 32/180/192/512 в assets/web. Запуск: python tools/icons/make_icons.py"""
+"""App icon: house roof (hub), lightning bolt (power stations), green bar (treadmill belt).
+Writes favicon.svg and PNG 32/180/192/512 to assets/web. Run: python tools/icons/make_icons.py"""
 from pathlib import Path
 from PIL import Image, ImageDraw
 
@@ -21,14 +21,14 @@ svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 
 
 def render(size: int, rounded: bool) -> Image.Image:
-    k = 4 * size / 512  # рисуем в 4× и уменьшаем — сглаживание
+    k = 4 * size / 512  # draw at 4x and downscale — for anti-aliasing
     big = 4 * size
     im = Image.new("RGBA", (big, big), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
     if rounded:
         d.rounded_rectangle((0, 0, big - 1, big - 1), radius=int(112 * k), fill=BG)
     else:
-        d.rectangle((0, 0, big, big), fill=BG)  # maskable: фон до края, система сама скруглит
+        d.rectangle((0, 0, big, big), fill=BG)  # maskable: background to the edge, the system rounds it itself
     s = lambda pts: [(x * k, y * k) for x, y in pts]
     w = int(44 * k)
     d.line(s(ROOF), fill=WHITE, width=w, joint="curve")

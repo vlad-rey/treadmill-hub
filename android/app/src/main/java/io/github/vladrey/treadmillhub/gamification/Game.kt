@@ -27,7 +27,7 @@ data class GameState(
     val recentRewards: List<RewardEarned>,
 )
 
-/** Ачивки и реальные награды. Проверки дешёвые: по сводкам тренировок с готовыми метриками. */
+/** Achievements and real rewards. Checks are cheap: based on session summaries with precomputed metrics. */
 class Game(
     dir: File,
     private val history: HistoryStore,
@@ -45,7 +45,7 @@ class Game(
         events = store.events(profileId),
     )
 
-    /** Новые ачивки профиля → окна на его телефоне. Вызывается после тренировки, записи веса, события. */
+    /** New achievements for the profile → popups on their phone. Called after a workout, weight entry, or event. */
     fun evaluate(profileId: String?) {
         profileId ?: return
         val have = store.achievements(profileId).map { it.achievementId }.toSet()
@@ -65,14 +65,14 @@ class Game(
         if (store.addEvent(profileId, event)) evaluate(profileId)
     }
 
-    /** Дистанция профиля за текущий период: сохранённые тренировки + идущая сейчас. */
+    /** Profile's distance for the current period: saved sessions + the one currently in progress. */
     private fun periodKm(profileId: String, period: Period, now: Long, liveSessionId: Long?, liveDistanceM: Double): Double {
         val start = Periods.start(period, now)
         val saved = history.list().filter { it.profileId == profileId && it.id >= start && it.id != liveSessionId }.sumOf { it.distanceM }
         return (saved + liveDistanceM) / 1000
     }
 
-    /** Проверка реальных наград во время тренировки — окно всплывает в момент достижения. */
+    /** Check real rewards during a workout — the popup appears the moment the goal is reached. */
     fun liveCheck(profileId: String?, liveSessionId: Long?, liveDistanceM: Double) {
         profileId ?: return
         val defs = store.rewards(profileId)

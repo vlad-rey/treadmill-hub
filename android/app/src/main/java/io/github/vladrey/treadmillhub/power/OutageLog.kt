@@ -7,7 +7,7 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
-/** Одно отключение света, как его видела станция. [endMs] = null — света нет до сих пор. */
+/** A single power outage, as seen by the station. [endMs] = null — still without power. */
 @Serializable
 data class Outage(
     val stationId: String,
@@ -16,17 +16,17 @@ data class Outage(
     val socStart: Double? = null,
     val socEnd: Double? = null,
     val minSoc: Double? = null,
-    /** Отдано из батареи на выходы за время без света, Вт·ч. */
+    /** Delivered from the battery to the outputs during the outage, Wh. */
     val batteryWh: Double = 0.0,
     val maxOutputW: Int = 0,
-    /** Начало или конец неточные: хаб был выключен или перезапускался. */
+    /** Start or end is imprecise: the hub was off or restarting. */
     val approximate: Boolean = false,
 )
 
 @Serializable
 data class OutageView(val stationName: String, val outage: Outage)
 
-/** Журнал отключений света по станциям (outages.json, последние [max] записей). */
+/** Log of power outages per station (outages.json, last [max] entries). */
 class OutageLog(private val file: File, private val max: Int = 1000) {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
     private val items: MutableList<Outage> =
@@ -46,7 +46,7 @@ class OutageLog(private val file: File, private val max: Int = 1000) {
         save()
     }
 
-    /** Состояние станции, пока нет света: минимальный заряд, энергия из батареи, пиковая нагрузка. */
+    /** Station state while there's no power: minimum charge, energy from the battery, peak load. */
     @Synchronized
     fun update(id: String, s: StationState) {
         val i = items.indexOfLast { it.stationId == id && it.endMs == null }

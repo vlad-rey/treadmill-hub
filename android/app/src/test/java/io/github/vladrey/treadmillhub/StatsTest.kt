@@ -13,14 +13,14 @@ class StatsTest {
     private fun s(id: Long, km: Double, profile: String?) = SessionSummary(id, 600.0, km * 1000, 50.0, 40.0, null, profile)
 
     @Test fun periodsAreCalendarBasedAndPerProfile() {
-        val now = ZonedDateTime.of(2026, 9, 25, 20, 0, 0, 0, zone) // пятница
+        val now = ZonedDateTime.of(2026, 9, 25, 20, 0, 0, 0, zone) // Friday
         val list = listOf(
-            s(at(2026, 9, 25), 2.0, "vlad"),      // сегодня
-            s(at(2026, 9, 21, 0), 3.0, "vlad"),   // понедельник этой недели, полночь
-            s(at(2026, 9, 20, 23), 4.0, "vlad"),  // воскресенье прошлой недели, этот месяц
-            s(at(2026, 8, 31), 5.0, "vlad"),   // прошлый месяц
-            s(at(2026, 9, 25), 7.0, "anna"),   // другой профиль
-            s(at(2026, 9, 25), 1.0, null),     // запуск с пульта, без владельца
+            s(at(2026, 9, 25), 2.0, "vlad"),      // today
+            s(at(2026, 9, 21, 0), 3.0, "vlad"),   // Monday of this week, midnight
+            s(at(2026, 9, 20, 23), 4.0, "vlad"),  // Sunday of last week, this month
+            s(at(2026, 8, 31), 5.0, "vlad"),   // last month
+            s(at(2026, 9, 25), 7.0, "anna"),   // a different profile
+            s(at(2026, 9, 25), 1.0, null),     // started from the console, no owner
         )
         val st = StatsCalculator.compute("vlad", list, now)
         assertEquals(2000.0, st.today.distanceM, 1e-9)

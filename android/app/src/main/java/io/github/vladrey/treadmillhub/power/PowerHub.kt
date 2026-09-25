@@ -19,8 +19,8 @@ data class StationConfig(val id: String = "", val name: String, val address: Str
 data class StationView(val id: String, val name: String, val address: String, val state: StationState, val stats: PeriodStats)
 
 /**
- * Станции Fossibot: список (хранится на хабе), опрос, свет есть/нет → Telegram.
- * Переходы на разных станциях в пределах [mergeMs] уходят одним сообщением.
+ * Fossibot stations: list (stored on the hub), polling, grid on/off → Telegram.
+ * Transitions on different stations within [mergeMs] are sent as one message.
  */
 class PowerHub(private val context: Context, dir: File, private val telegram: Telegram, private val mergeMs: Long = 30_000) {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
@@ -32,7 +32,7 @@ class PowerHub(private val context: Context, dir: File, private val telegram: Te
     private val trackers = HashMap<String, StationStatsTracker>()
     val statsStore = StationStatsStore(File(dir, "stations-stats.json"))
     val outages = OutageLog(File(dir, "outages.json"))
-    private val pending = ArrayList<Pair<Long, String>>() // (время, текст)
+    private val pending = ArrayList<Pair<Long, String>>() // (time, text)
     private lateinit var scope: CoroutineScope
 
     fun start(scope: CoroutineScope) {
@@ -66,7 +66,7 @@ class PowerHub(private val context: Context, dir: File, private val telegram: Te
         StationView(c.id, c.name, c.address, stations[c.id]?.state?.value ?: StationState(), statsStore.periods(c.id))
     }
 
-    /** Замена списка станций: новые подключаются, удалённые отключаются. */
+    /** Replace the station list: new ones connect, removed ones disconnect. */
     fun setConfigs(input: List<StationConfig>): List<StationView> {
         val next = input.map { c ->
             require(c.name.isNotBlank() && c.name.length <= 30) { "имя станции 1–30 символов" }
@@ -86,7 +86,7 @@ class PowerHub(private val context: Context, dir: File, private val telegram: Te
         return list()
     }
 
-    /** Журнал отключений, новые сверху. */
+    /** Outage log, newest first. */
     fun outageList(limit: Int = 200): List<OutageView> {
         val names = configs.associate { it.id to it.name }
         return outages.all().take(limit).map { OutageView(names[it.stationId] ?: "удалённая станция", it) }
@@ -103,13 +103,13 @@ class PowerHub(private val context: Context, dir: File, private val telegram: Te
             val watch = watches[c.id] ?: continue
             val wasOn = watch.gridOn
             val text = watch.update(st)
-            // Отключение засчитывается, когда GridWatch подтвердил его (без дребезга)
+            // An outage is confirmed once GridWatch has debounced it
             val on = watch.gridOn
             trackers[c.id]?.onState(st, on, outageStarted = wasOn == true && on == false)
             when {
                 wasOn == true && on == false -> outages.start(c.id, watch.changedAtMs ?: st.updatedAtMs, st.socPct)
                 wasOn == false && on == true -> outages.end(c.id, watch.changedAtMs ?: st.updatedAtMs, st.socPct)
-                // Хаб перезапускался: отключение, начатое до перезапуска, продолжается или уже закончилось
+                // The hub restarted: an outage that started before the restart is either still ongoing or already over
                 wasOn == null && on == true -> outages.end(c.id, st.updatedAtMs, st.socPct, approximate = true)
                 wasOn == null && on == false -> outages.start(c.id, st.updatedAtMs, st.socPct, approximate = true)
             }

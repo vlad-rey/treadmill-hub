@@ -12,18 +12,18 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 
-/** Итоги станции за день (или сумма за период). */
+/** Station totals for a day (or sum over a period). */
 @Serializable
 data class StationTotals(
-    /** Сколько раз начиналась зарядка от сети. */
+    /** How many times AC charging started. */
     val chargeSessions: Int = 0,
-    /** Набранные и отданные проценты батареи. 100 % заряда = 1 эквивалентный полный цикл. */
+    /** Battery percent gained and given up. 100% charge = 1 equivalent full cycle. */
     val chargedPct: Double = 0.0,
     val dischargedPct: Double = 0.0,
-    /** Энергия зарядки от сети и энергия на выходе, Вт·ч. */
+    /** Energy from AC charging and energy delivered to the output, Wh. */
     val chargedWh: Double = 0.0,
     val outputWh: Double = 0.0,
-    /** Отдано на выход, пока не было света (т. е. из батареи), Вт·ч. */
+    /** Delivered to the output while there was no grid power (i.e. from the battery), Wh. */
     val offgridOutputWh: Double = 0.0,
     val outages: Int = 0,
     val outageS: Double = 0.0,
@@ -43,7 +43,7 @@ data class PeriodStats(
     val sinceDate: String?,
 )
 
-/** Хранилище: станция → дата (ГГГГ-ММ-ДД) → итоги дня. Сохраняется не чаще раза в минуту. */
+/** Storage: station → date (YYYY-MM-DD) → day totals. Saved no more often than once a minute. */
 class StationStatsStore(private val file: File, private val zone: ZoneId = ZoneId.systemDefault()) {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
     private val days: MutableMap<String, MutableMap<String, StationTotals>> =
@@ -70,7 +70,7 @@ class StationStatsStore(private val file: File, private val zone: ZoneId = ZoneI
         Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
     }
 
-    /** Итоги за даты [from]..[to] включительно. */
+    /** Totals for dates [from]..[to] inclusive. */
     @Synchronized
     fun range(stationId: String, from: LocalDate, to: LocalDate): StationTotals =
         days[stationId].orEmpty().filterKeys { LocalDate.parse(it) in from..to }.values.fold(StationTotals()) { a, b -> a + b }
@@ -93,9 +93,9 @@ class StationStatsStore(private val file: File, private val zone: ZoneId = ZoneI
 }
 
 /**
- * Превращает поток состояний станции в приращения итогов. Проценты — по изменению заряда
- * (рост — «заряжено», падение — «разряжено»), энергия — интегрированием мощности по времени,
- * начало зарядки — когда зарядная мощность держится > 20 Вт два опроса подряд.
+ * Turns a stream of station states into total increments. Percent — from charge change
+ * (increase — "charged", decrease — "discharged"), energy — by integrating power over time,
+ * charging start — when charging power stays above 20 W for two polls in a row.
  */
 class StationStatsTracker(private val stationId: String, private val store: StationStatsStore) {
     private var lastTs = 0L
@@ -103,7 +103,7 @@ class StationStatsTracker(private val stationId: String, private val store: Stat
     private var chargingPolls = 0
     private var charging = false
 
-    /** [gridOn] — подтверждённое (без дребезга) состояние света из GridWatch; [outageStarted] — свет только что пропал. */
+    /** [gridOn] — confirmed (debounced) power state from GridWatch; [outageStarted] — power just went out. */
     fun onState(s: StationState, gridOn: Boolean?, outageStarted: Boolean) {
         if (!s.connected || s.updatedAtMs == lastTs) return
         val now = s.updatedAtMs

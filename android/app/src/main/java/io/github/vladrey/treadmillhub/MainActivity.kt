@@ -5,7 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.TextView
 
-/** Экран на самом телефоне: только запуск сервиса и адрес веб-интерфейса. */
+/** Screen on the phone itself: just starts the service and shows the web UI address. */
 class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

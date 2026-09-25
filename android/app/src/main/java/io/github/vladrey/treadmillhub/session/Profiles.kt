@@ -11,7 +11,7 @@ import java.time.ZonedDateTime
 import java.time.temporal.TemporalAdjusters
 import java.util.UUID
 
-/** Пользователь дорожки. Хранится на хабе; телефон помнит только свой id. */
+/** A treadmill user. Stored on the hub; the phone only remembers its own id. */
 @Serializable
 data class Profile(val id: String, val name: String, val weightKg: Double, val maxSpeedKmh: Double)
 
@@ -66,7 +66,7 @@ class ProfileStore(private val file: File) {
     }
 }
 
-// --- История веса -----------------------------------------------------------------------
+// --- Weight history -----------------------------------------------------------------------
 
 @Serializable
 data class WeightEntry(val profileId: String, val atMs: Long, val kg: Double)
@@ -74,7 +74,7 @@ data class WeightEntry(val profileId: String, val atMs: Long, val kg: Double)
 @Serializable
 data class WeightInput(val kg: Double)
 
-/** Записи веса по профилям. Последняя запись = текущий вес профиля (по нему считаются калории). */
+/** Weight entries per profile. The latest entry = the profile's current weight (used for calorie calculations). */
 class WeightStore(private val file: File) {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
     private var entries: List<WeightEntry> =
@@ -106,7 +106,7 @@ data class Totals(
 @Serializable
 data class ProfileStats(val profileId: String?, val today: Totals, val week: Totals, val month: Totals, val all: Totals)
 
-/** Итоги по периодам: сегодня, неделя с понедельника, календарный месяц, всё время. */
+/** Totals by period: today, week starting Monday, calendar month, all time. */
 object StatsCalculator {
     fun compute(profileId: String?, sessions: List<SessionSummary>, now: ZonedDateTime): ProfileStats {
         val zone = now.zone

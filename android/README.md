@@ -1,77 +1,77 @@
-# android — хаб
+# android — hub
 
-Kotlin, `minSdk 28` (Redmi 6: Android 9, 32-битный). Foreground service `HubService`:
+Kotlin, `minSdk 28` (Redmi 6: Android 9, 32-bit). Foreground service `HubService`:
 
-- `treadmill/` — `TreadmillBackend`: `FtmsBleBackend` (FTMS + FitShow FFF1, библиотека Nordic BLE) и `SimulatorBackend`; разбор пакетов в `Codecs.kt`.
-- `session/` — учёт тренировки: дистанция по скорости (FTMS на T12B отдаёт 0), разбивка «скорость × наклон», калории по ACSM.
-- `HubServer.kt` — Ktor (CIO): REST, WebSocket, статика веб-интерфейса из `assets/web`.
+- `treadmill/` — `TreadmillBackend`: `FtmsBleBackend` (FTMS + FitShow FFF1, Nordic BLE library) and `SimulatorBackend`; packet parsing in `Codecs.kt`.
+- `session/` — workout tracking: distance from speed (FTMS on the T12B reports 0), "speed × incline" breakdown, calories via ACSM.
+- `HubServer.kt` — Ktor (CIO): REST, WebSocket, static web UI files from `assets/web`.
 
-## Сборка и установка
+## Build and install
 
 ```bash
 powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 ```
 
-Нужны JDK 17 и Android SDK. Скрипт гоняет unit-тесты, собирает APK, ставит через root (`pm install` — MIUI блокирует `adb install`), выдаёт разрешения и перезапускает сервис. Автозапуск при загрузке — Magisk-скрипт `40-treadmill-hub.sh` из [redmi6-homeserver](https://github.com/vlad-rey/redmi6-homeserver).
+Requires JDK 17 and the Android SDK. The script runs unit tests, builds the APK, installs it via root (`pm install` — MIUI blocks `adb install`), grants permissions, and restarts the service. Autostart on boot is handled by the Magisk script `40-treadmill-hub.sh` from [redmi6-homeserver](https://github.com/vlad-rey/redmi6-homeserver).
 
-Версии подобраны под AGP 8.13: Kotlin 2.2.21, coroutines 1.10.2, serialization 1.9.0 (более новые собраны Kotlin 2.4, D8 из AGP 8.13 их метаданные не понимает).
+Versions are pinned for AGP 8.13: Kotlin 2.2.21, coroutines 1.10.2, serialization 1.9.0 (newer ones are built with Kotlin 2.4, and D8 from AGP 8.13 can't read their metadata).
 
-## API (порт 8080)
+## API (port 8080)
 
-| Метод | Путь | Что |
+| Method | Path | What |
 |---|---|---|
-| GET | `/` | главная: меню с состоянием дорожки, станций, сети и хаба |
-| GET | `/treadmill/` | дорожка (вкладки открываются ссылкой `#programs`, `#history`, `#awards`) |
-| GET | `/hub/`, `/net/` | состояние хаба (батарея, память, связь с дорожкой, бэкап); сеть (роутер, интернет, журнал сбоев) |
-| GET | `/api/state` | снимок: `treadmill`, `session`, `hub` |
-| WS | `/ws/live` | тот же снимок при каждом изменении (~1 Гц) |
+| GET | `/` | home page: menu with treadmill, station, network, and hub status |
+| GET | `/treadmill/` | treadmill (tabs open via the `#programs`, `#history`, `#awards` links) |
+| GET | `/hub/`, `/net/` | hub status (battery, memory, connection to the treadmill, backup); network (router, internet, outage log) |
+| GET | `/api/state` | snapshot: `treadmill`, `session`, `hub` |
+| WS | `/ws/live` | the same snapshot on every change (~1 Hz) |
 | POST | `/api/control` | `{"action": "start\|stop\|pause\|speed\|incline\|speedDelta\|inclineDelta\|program\|programEnd", "value": 5.0, "profileId": "…", "programId": "P3", "level": 4, "minutes": 30}` |
-| GET/POST | `/api/config` | `deviceAddress`, `backend` (`ftms`/`sim`), `weightKg`, `maxSpeedKmh` (по умолчанию 12) |
-| WS | `/ws/debug/ble` | сырые BLE-пакеты в hex (для агентов) |
-| GET/POST | `/api/profiles`, `/api/profiles/{id}` | профили: имя, вес, лимит скорости |
-| GET/POST | `/api/profiles/{id}/weights` | история веса; POST `{kg}` — новая запись и новый текущий вес профиля |
-| GET | `/api/export/sessions.csv?profile=ID`, `/api/sessions/{id}/export?format=tcx\|csv` | экспорт: таблица тренировок; TCX для Strava/Garmin; посекундный CSV |
-| POST | `/api/hub/backup` | отметка скрипта бэкапа на PC |
-| GET | `/api/game/{profileId}` | ачивки (прогресс, получено) и реальные награды профиля (прогресс за период, заработано, вручено) |
-| POST | `/api/game/{profileId}/rewards` | задать реальные награды профиля: `[{id, title, icon, period: WEEK\|MONTH, km, effect: sound\|fireworks}]` |
-| POST | `/api/game/celebrations/{id}/ack`, `/api/game/rewards/{id}/{period}/delivered`, `/api/game/telegram-test` | подтвердить окно; отметить «вручено»; пробное сообщение в Telegram |
-| GET | `/api/stats?profile=ID` | итоги: сегодня / неделя / месяц / всё время |
-| GET | `/api/sessions?profile=ID`, `/api/sessions/{id}` | история (пустой `profile=` — без владельца) |
-| POST | `/api/sessions/{id}/profile`, `/api/sessions/{id}/console` | переназначить владельца; показания пульта для сверки |
-| GET | `/api/programs?profile=ID` | встроенные P1–P8 + свои (общие и профиля) |
-| GET | `/api/programs/{id}/segments?level=&minutes=&profile=` | отрезки для предпросмотра (скорость ≤ лимита профиля) |
-| POST/DELETE | `/api/programs`, `/api/programs/{id}` | свои программы: `{name, profileId, blocks:[{repeat, steps:[{durationS, speedKmh, inclinePct?}]}]}` |
-| GET | `/power/` | страница станций Fossibot F2400: заряд, мощности, настройки, статистика |
-| GET | `/api/power` | станции: `{id, name, address, state, stats}`; `stats` — итоги за `today/week/month/quarter/year/all` (`chargeSessions`, `chargedPct`, `dischargedPct`, `chargedWh`, `outputWh`, `offgridOutputWh`, `outages`, `outageS`) и `sinceDate`; цикл = `chargedPct / 100` |
-| GET | `/api/power/outages` | журнал отключений света: `[{stationName, outage: {stationId, startMs, endMs, socStart, socEnd, minSoc, batteryWh, maxOutputW, approximate}}]`, новые сверху |
-| GET | `/api/net/outages` | журнал сбоев сети `[{kind: ROUTER\|INTERNET, startMs, endMs}]`; текущее состояние — `/api/state` → `hub.net` (проверка каждые 20 с: пинг шлюза Wi-Fi, TCP к 1.1.1.1/8.8.8.8/9.9.9.9) |
-| GET | `/api/router` | роутер ASUS: `{configured, user, connected, model, error, waitingForPassword, lastOkMs, clients, online, wanDownMbps, wanUpMbps}` (пароль не отдаётся) |
-| POST | `/api/router/credentials` | `{user, password}` — логин и пароль администратора роутера; `password: null` — отключить роутер |
-| GET | `/api/net/speed` | замеры скорости роутером: `{running, results: [{atMs, downMbps, upMbps, pingMs, error}]}` |
-| POST | `/api/net/speed/run` | запустить замер сейчас (202; 409 — уже идёт или роутер не подключён) |
-| GET | `/api/router/debug?hook=…` / `?page=/…` | отладка интеграции: сырой ответ роутера; только с самого телефона (`adb forward`), из Wi-Fi — 403 |
-| GET | `/api/net/devices` | устройства в Wi-Fi: `{devices: [{mac, ip, name, hostname, firstSeenMs, lastSeenMs, known}], learnUntilMs, lastScanMs}` (опрос /24 раз в 5 мин, ARP; первые сутки — обучение) |
-| POST/DELETE | `/api/net/devices/{mac}` | `{name?, known?}` — имя и «своё»; DELETE — забыть устройство |
-| POST | `/api/power/stations` | список станций `[{id, name, address}]` (пустой `id` — новая) |
-| POST | `/api/power/{id}/settings` | `{key, value}` — только разрешённые настройки, с проверкой чтением |
+| GET/POST | `/api/config` | `deviceAddress`, `backend` (`ftms`/`sim`), `weightKg`, `maxSpeedKmh` (default 12) |
+| WS | `/ws/debug/ble` | raw BLE packets in hex (for agents) |
+| GET/POST | `/api/profiles`, `/api/profiles/{id}` | profiles: name, weight, speed limit |
+| GET/POST | `/api/profiles/{id}/weights` | weight history; POST `{kg}` — new entry and new current weight for the profile |
+| GET | `/api/export/sessions.csv?profile=ID`, `/api/sessions/{id}/export?format=tcx\|csv` | export: workout table; TCX for Strava/Garmin; per-second CSV |
+| POST | `/api/hub/backup` | marker for the backup script on the PC |
+| GET | `/api/game/{profileId}` | achievements (progress, earned) and the profile's real-world rewards (progress for the period, earned, delivered) |
+| POST | `/api/game/{profileId}/rewards` | set the profile's real-world rewards: `[{id, title, icon, period: WEEK\|MONTH, km, effect: sound\|fireworks}]` |
+| POST | `/api/game/celebrations/{id}/ack`, `/api/game/rewards/{id}/{period}/delivered`, `/api/game/telegram-test` | acknowledge a celebration popup; mark a reward as "delivered"; send a test Telegram message |
+| GET | `/api/stats?profile=ID` | totals: today / week / month / all time |
+| GET | `/api/sessions?profile=ID`, `/api/sessions/{id}` | history (empty `profile=` — no owner) |
+| POST | `/api/sessions/{id}/profile`, `/api/sessions/{id}/console` | reassign the owner; console readout for cross-checking |
+| GET | `/api/programs?profile=ID` | built-in P1–P8 plus custom programs (shared and profile-specific) |
+| GET | `/api/programs/{id}/segments?level=&minutes=&profile=` | segments for preview (speed capped at the profile's limit) |
+| POST/DELETE | `/api/programs`, `/api/programs/{id}` | custom programs: `{name, profileId, blocks:[{repeat, steps:[{durationS, speedKmh, inclinePct?}]}]}` |
+| GET | `/power/` | Fossibot F2400 station page: charge, power, settings, stats |
+| GET | `/api/power` | stations: `{id, name, address, state, stats}`; `stats` — totals for `today/week/month/quarter/year/all` (`chargeSessions`, `chargedPct`, `dischargedPct`, `chargedWh`, `outputWh`, `offgridOutputWh`, `outages`, `outageS`) and `sinceDate`; cycle = `chargedPct / 100` |
+| GET | `/api/power/outages` | power-outage log: `[{stationName, outage: {stationId, startMs, endMs, socStart, socEnd, minSoc, batteryWh, maxOutputW, approximate}}]`, newest first |
+| GET | `/api/net/outages` | network outage log `[{kind: ROUTER\|INTERNET, startMs, endMs}]`; current state — `/api/state` → `hub.net` (checked every 20 s: ping the Wi-Fi gateway, TCP to 1.1.1.1/8.8.8.8/9.9.9.9) |
+| GET | `/api/router` | ASUS router: `{configured, user, connected, model, error, waitingForPassword, lastOkMs, clients, online, wanDownMbps, wanUpMbps}` (password is never returned) |
+| POST | `/api/router/credentials` | `{user, password}` — router admin login and password; `password: null` — disconnect the router |
+| GET | `/api/net/speed` | router-measured speed tests: `{running, results: [{atMs, downMbps, upMbps, pingMs, error}]}` |
+| POST | `/api/net/speed/run` | run a speed test now (202; 409 — one is already running or the router isn't connected) |
+| GET | `/api/router/debug?hook=…` / `?page=/…` | integration debugging: raw router response; only from the phone itself (`adb forward`) — 403 over Wi-Fi |
+| GET | `/api/net/devices` | devices on Wi-Fi: `{devices: [{mac, ip, name, hostname, firstSeenMs, lastSeenMs, known}], learnUntilMs, lastScanMs}` (polls the /24 every 5 min via ARP; the first day is a learning period) |
+| POST/DELETE | `/api/net/devices/{mac}` | `{name?, known?}` — name and "known" flag; DELETE — forget the device |
+| POST | `/api/power/stations` | station list `[{id, name, address}]` (empty `id` — new station) |
+| POST | `/api/power/{id}/settings` | `{key, value}` — only allow-listed settings, verified by reading back |
 
-Лимиты проверяются на хабе: скорость 1–min(лимит, 16) км/ч, наклон 0–15 %. `stop` не ждёт в очереди за другими командами.
+Limits are enforced on the hub: speed 1–min(limit, 16) km/h, incline 0–15%. `stop` does not wait in the queue behind other commands.
 
-**Агентам:** `/api/control` двигает ленту — только с подтверждением владельца (см. `CLAUDE.md`). Для проверок без риска — `backend: "sim"` и перезапуск сервиса.
+**For agents:** `/api/control` moves the belt — only with the owner's confirmation (see `CLAUDE.md`). For risk-free checks, use `backend: "sim"` and restart the service.
 
-Сообщения в Telegram идут через очередь (`telegram-outbox.json`): без интернета они ждут и уходят позже с пометкой «отправлено с задержкой».
+Telegram messages go through a queue (`telegram-outbox.json`): without internet they wait and are sent later, marked "sent with a delay".
 
-Иконка приложения рисуется скриптом `tools/icons/make_icons.py` (SVG-фавикон и PNG 32/180/192/512).
+The app icon is drawn by the `tools/icons/make_icons.py` script (SVG favicon and PNG 32/180/192/512).
 
-### Telegram-бот
+### Telegram bot
 
-Команды принимаются long polling (`getUpdates`). Владелец — чат из настроек хаба; другим чатам доступ открывает владелец (`/allow ID Имя_профиля`), список — `bot.json`.
-- `/status`, `/progress`, `/week`, `/help` — всем, у кого есть доступ; `/charge 100` (50–100, шаг 5, можно номер станции), `/speedtest`, `/allow`, `/deny`, `/me`, `/chats` — владельцу.
-- Понедельник 09:00 — отчёт за прошлую неделю: владельцу — дом (свет, станции, интернет, тренировки всех), каждому привязанному чату — его дорожка.
-- 19:00 — напоминания о незаработанных наградах: недельные — в чт и сб, месячные — за 7, 3 и 1 день до конца месяца.
+Commands are received via long polling (`getUpdates`). The owner is the chat set in the hub's settings; the owner grants other chats access (`/allow ID Profile_Name`), the list is stored in `bot.json`.
+- `/status`, `/progress`, `/week`, `/help` — available to anyone with access; `/charge 100` (50–100, step 5, optionally with a station number), `/speedtest`, `/allow`, `/deny`, `/me`, `/chats` — owner only.
+- Monday 09:00 — last week's report: the owner gets the whole household (power, stations, internet, everyone's workouts), each linked chat gets its own treadmill.
+- 19:00 — reminders about unearned rewards: weekly ones on Thu and Sat, monthly ones 7, 3, and 1 day before the end of the month.
 
-### Роутер ASUS
+### ASUS router
 
-Вход как приложение ASUS Router (`login.cgi` → `asus_token`, User-Agent `asusrouter--DUTUtil-`), данные — `appGet.cgi?hook=…`: `get_clientlist()`, `netdev(appobj)`, `nvram_get(productid)`.
-Замер скорости — встроенный Ookla: `ookla_speedtest_exe.cgi` → опрос `ookla_speedtest_get_result()` до записи `type=result` (полоса в байтах/с) → `ookla_speedtest_write_history.cgi`, чтобы замер был и в истории роутера. По расписанию — 7:00 и 21:00, во время тренировки откладывается; скорость ниже половины медианы 10 прошлых замеров — сообщение в Telegram.
-Wi-Fi станций Fossibot (ESP32) узнаётся по MAC = Bluetooth-адрес − 2 и подписывается именем станции.
+Logs in as the ASUS Router app (`login.cgi` → `asus_token`, User-Agent `asusrouter--DUTUtil-`), data comes from `appGet.cgi?hook=…`: `get_clientlist()`, `netdev(appobj)`, `nvram_get(productid)`.
+Speed testing uses the router's built-in Ookla test: `ookla_speedtest_exe.cgi` → poll `ookla_speedtest_get_result()` until a `type=result` record (bandwidth in bytes/s) → `ookla_speedtest_write_history.cgi`, so the test also shows up in the router's own history. Scheduled at 7:00 and 21:00, deferred during a workout; a result below half the median of the last 10 tests triggers a Telegram message.
+The Fossibot stations' Wi-Fi (ESP32) is identified by MAC = Bluetooth address − 2 and labeled with the station's name.

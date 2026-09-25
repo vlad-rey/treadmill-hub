@@ -1,10 +1,10 @@
-"""Чтение статуса станции Fossibot (Sydpower / BrightEMS) по BLE — только чтение.
+"""Read the status of a Fossibot (Sydpower / BrightEMS) power station over BLE — read-only.
 
-    python fossibot_probe.py <адрес> [--polls 3]
+    python fossibot_probe.py <address> [--polls 3]
 
-Протокол: сервис A002, запись C304, уведомления C305. Запрос «прочитать 80 input-регистров»:
-11 04 00 00 00 50 + CRC-16 Modbus. В ответе регистры начинаются с байта 6, по 2 байта big-endian.
-Источники: github.com/Ylianst/ESP-FBot, github.com/dandwhelan/fossibot-bluetooth.
+Protocol: service A002, write C304, notify C305. "Read 80 input registers" request:
+11 04 00 00 00 50 + CRC-16 Modbus. In the response, registers start at byte 6, 2 bytes big-endian each.
+Sources: github.com/Ylianst/ESP-FBot, github.com/dandwhelan/fossibot-bluetooth.
 """
 
 import argparse
@@ -16,8 +16,8 @@ from bleak import BleakClient
 WRITE = "0000c304-0000-1000-8000-00805f9b34fb"
 NOTIFY = "0000c305-0000-1000-8000-00805f9b34fb"
 
-NAMES = {3: "AC вход, Вт", 4: "DC вход, Вт", 6: "вход всего, Вт", 7: "сеть, Вт", 20: "выход всего, Вт",
-         21: "AC вход, В×10 / код", 39: "выход (приложение), Вт", 48: "флаги", 56: "батарея, %×10"}
+NAMES = {3: "AC input, W", 4: "DC input, W", 6: "total input, W", 7: "grid, W", 20: "total output, W",
+         21: "AC input, V×10 / code", 39: "output (app), W", 48: "flags", 56: "battery, %×10"}
 
 
 def crc16(data: bytes) -> int:
@@ -51,16 +51,16 @@ async def main(address: str, polls: int) -> None:
             buf.clear()
 
     async with BleakClient(address, timeout=20) as client:
-        print("подключено:", address)
+        print("connected:", address)
         await client.start_notify(NOTIFY, on_notify)
         for hi_first in (True, False):
             await client.write_gatt_char(WRITE, request(hi_first), response=False)
             try:
                 frame = await asyncio.wait_for(got.get(), 5)
-                print(f"ответ получен (CRC {'старший байт первым' if hi_first else 'младший первым'}), {len(frame)} байт")
+                print(f"response received (CRC {'high byte first' if hi_first else 'low byte first'}), {len(frame)} bytes")
                 break
             except asyncio.TimeoutError:
-                print(f"нет ответа (CRC {'hi' if hi_first else 'lo'} first)")
+                print(f"no response (CRC {'hi' if hi_first else 'lo'} first)")
         else:
             return
         for i in range(polls):
@@ -69,19 +69,19 @@ async def main(address: str, polls: int) -> None:
                 await client.write_gatt_char(WRITE, request(hi_first), response=False)
                 frame = await asyncio.wait_for(got.get(), 5)
             regs = [(frame[6 + 2 * r] << 8) | frame[7 + 2 * r] for r in range(80)]
-            print(f"--- опрос {i + 1}")
+            print(f"--- poll {i + 1}")
             if FUNC == 0x04:
                 for r, name in NAMES.items():
                     print(f"  reg {r:2} = {regs[r]:6}  {name}")
             nz = {r: v for r, v in enumerate(regs) if v and (FUNC != 0x04 or r not in NAMES)}
-            print("  ненулевые:", nz)
+            print("  non-zero:", nz)
 
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("address")
     p.add_argument("--polls", type=int, default=3)
-    p.add_argument("--holding", action="store_true", help="читать настройки (0x03) вместо статуса (0x04)")
+    p.add_argument("--holding", action="store_true", help="read settings (0x03) instead of status (0x04)")
     a = p.parse_args()
     if a.holding:
         FUNC = 0x03

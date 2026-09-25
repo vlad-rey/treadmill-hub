@@ -1,35 +1,34 @@
-# 0004. Калории: с дорожки и свой расчёт
+# 0004. Calories: from the treadmill and our own calculation
 
-Статус: принято, 2026-09-25
+Status: accepted, 2026-09-25
 
-## Контекст
+## Context
 
-Дорожка отдаёт израсходованную энергию: FTMS `Total Energy` (ккал) и, по-видимому, поле FitShow `0x51` в десятых долях ккал. Есть подозрение, что дорожка не учитывает наклон и вес пользователя (она его не знает).
+The treadmill reports energy expended: FTMS `Total Energy` (kcal) and, apparently, FitShow field `0x51` in tenths of a kcal. There's a suspicion that the treadmill doesn't account for incline or the user's weight (it doesn't know it).
 
-## Решение
+## Decision
 
-Показываем **оба значения** рядом:
+Show **both values** side by side:
 
-1. **«Дорожка»** — как есть из FTMS (при необходимости — точнее из FitShow, ×0,1).
-2. **«Расчёт»** — по метаболическим уравнениям ACSM, каждую секунду по текущей скорости и наклону, с учётом веса профиля.
+1. **"Treadmill"** — as reported by FTMS (or, if more precise, from FitShow, ×0.1).
+2. **"Calculated"** — using ACSM metabolic equations, computed every second from the current speed and incline, accounting for the profile's weight.
 
-### Формулы ACSM
+### ACSM formulas
 
-`S` — скорость, м/мин; `G` — наклон, доля (5 % = 0,05). VO₂ — мл/кг/мин.
+`S` — speed, m/min; `G` — incline, as a fraction (5% = 0.05). VO₂ — ml/kg/min.
 
-| Режим | VO₂ |
+| Mode | VO₂ |
 |---|---|
-| Ходьба | `3,5 + 0,1·S + 1,8·S·G` |
-| Бег | `3,5 + 0,2·S + 0,9·S·G` |
+| Walking | `3.5 + 0.1·S + 1.8·S·G` |
+| Running | `3.5 + 0.2·S + 0.9·S·G` |
 
-- Ходьба до 6,5 км/ч, бег от 8,0 км/ч, между ними — линейная интерполяция (зона смешанной походки). Пороги — в настройках.
-- ккал/мин = VO₂ × вес (кг) / 1000 × 5 (≈ 5 ккал на литр O₂).
-- Показываем **полный** расход (с учётом покоя, как делают дорожки и часы). Дополнительно храним «активный» (без 3,5 мл/кг/мин покоя).
-- Интегрируем по каждому сэмплу (1 Гц) — корректно при смене скорости и наклона внутри программы.
+- Walking up to 6.5 km/h, running from 8.0 km/h, linear interpolation in between (mixed-gait zone). Thresholds are configurable.
+- kcal/min = VO₂ × weight (kg) / 1000 × 5 (≈ 5 kcal per liter of O₂).
+- We show the **total** expenditure (including resting metabolism, as treadmills and watches do). We additionally store the "active" value (excluding the 3.5 ml/kg/min resting component).
+- Integrated per sample (1 Hz) — correct even when speed and incline change within a program.
 
+## Consequences
 
-## Последствия
-
-- В профиле нужен **вес**. Расчёт по пульсу не делаем (решение владельца 2026-09-25).
-- В истории сохраняются оба значения, в статистике видно расхождение.
-- Проверка гипотезы: одна и та же тренировка при 0 % и 10 % — меняется ли значение дорожки.
+- The profile needs a **weight**. We don't compute from heart rate (owner's decision, 2026-09-25).
+- Both values are stored in history; stats show the discrepancy between them.
+- Hypothesis to check: does the treadmill's value change for the same workout at 0% versus 10% incline.

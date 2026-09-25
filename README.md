@@ -1,37 +1,37 @@
 # treadmill-hub
 
-Домашний хаб для беговой дорожки **FitLogic T12B** (Bluetooth-модуль FitShow).
+Home hub for the **FitLogic T12B** treadmill (FitShow Bluetooth module).
 
-Старый телефон (Xiaomi Redmi 6) стоит рядом с дорожкой, держит с ней постоянное BLE-соединение и раздаёт по домашней сети PWA: телеметрия в реальном времени, управление скоростью и наклоном, встроенные и собственные программы тренировок, история и статистика для нескольких пользователей.
+An old phone (Xiaomi Redmi 6) sits next to the treadmill, keeps a permanent BLE connection to it, and serves a PWA over the home network: real-time telemetry, speed and incline control, built-in and custom workout programs, and history and stats for multiple users.
 
-> Статус: **планирование / этап 0 (разведка протокола)**. См. [docs/PLAN.md](docs/PLAN.md).
+> Status: **planning / stage 0 (protocol recon)**. See [docs/PLAN.md](docs/PLAN.md).
 
-## Архитектура (кратко)
+## Architecture (brief)
 
 ```
-FitLogic T12B ──BLE──▶ Redmi 6 (Android-хаб)  ──HTTP/WebSocket (LAN)──▶ PWA на Pixel 9 / Pixel 10
-                        ├─ BLE-сервис (FitShow / FTMS / симулятор)
-                        ├─ движок программ
-                        ├─ SQLite (история)
-                        └─ debug API для агентов
+FitLogic T12B ──BLE──▶ Redmi 6 (Android hub)  ──HTTP/WebSocket (LAN)──▶ PWA on Pixel 9 / Pixel 10
+                        ├─ BLE service (FitShow / FTMS / simulator)
+                        ├─ program engine
+                        ├─ SQLite (history)
+                        └─ debug API for agents
 ```
 
-## Структура
+## Structure
 
-| Папка | Что внутри |
+| Folder | What's inside |
 |---|---|
-| `android/` | Android-хаб (Kotlin): BLE, HTTP/WS-сервер, движок программ, хранилище |
-| `web/` | PWA-клиент |
-| `protocol/` | Описание BLE-протокола дорожки, отфильтрованные записи обмена, тестовые пакеты |
-| `tools/` | Скрипты для PC: прототип на `bleak`, парсер btsnoop, ADB-утилиты |
-| `docs/` | План, решения (ADR), чек-листы |
+| `android/` | Android hub (Kotlin): BLE, HTTP/WS server, program engine, storage |
+| `web/` | PWA client |
+| `protocol/` | Description of the treadmill's BLE protocol, filtered exchange captures, test packets |
+| `tools/` | PC scripts: `bleak` prototype, btsnoop parser, ADB utilities |
+| `docs/` | Plan, decisions (ADR), checklists |
 
-Инфраструктура самого телефона (root, Magisk, ограничение заряда, Termux) живёт в отдельном репозитории [redmi6-homeserver](https://github.com/vlad-rey/redmi6-homeserver).
+Infrastructure for the phone itself (root, Magisk, charge limiting, Termux) lives in a separate repository, [redmi6-homeserver](https://github.com/vlad-rey/redmi6-homeserver).
 
-## Безопасность
+## Safety
 
-Физический ключ безопасности дорожки остаётся главным способом остановки. Приложение его не заменяет. Правила для агентов и разработки: [CLAUDE.md](CLAUDE.md).
+The treadmill's physical safety key remains the primary way to stop it. The app does not replace it. Rules for agents and development: [CLAUDE.md](CLAUDE.md).
 
-## Лицензия
+## License
 
-MIT. Протокол изучается по записям собственного обмена и открытым источникам. Чужой код (в т. ч. GPL-код qdomyos-zwift и декомпилированный FitShow) в репозиторий не копируется.
+MIT. The protocol is studied from our own exchange captures and public sources. Third-party code (including GPL-licensed code from qdomyos-zwift and decompiled FitShow code) is not copied into the repository.

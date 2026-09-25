@@ -7,7 +7,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 
-/** Посекундный сэмпл тренировки. t — мс от начала. */
+/** Per-second workout sample. t — ms since start. */
 @Serializable
 data class Sample(
     val t: Long,
@@ -16,11 +16,11 @@ data class Sample(
     val kcalTreadmill: Double? = null,
     val heartRate: Int? = null,
     val vendorRaw: List<Int>? = null,
-    /** Показание счётчика дистанции дорожки, м (для сверки с расчётом по скорости). */
+    /** Treadmill distance counter reading, m (for cross-checking against the speed-based calculation). */
     val distanceTreadmillM: Int? = null,
 )
 
-/** Что показал пульт дорожки в конце — вносится вручную, для калибровки. */
+/** What the treadmill console showed at the end — entered manually, for calibration. */
 @Serializable
 data class ConsoleReading(val distanceKm: Double? = null, val kcal: Double? = null, val timeS: Int? = null, val note: String? = null)
 
@@ -31,9 +31,9 @@ data class SavedSession(
     val stats: SessionStats,
     val samples: List<Sample>,
     val console: ConsoleReading? = null,
-    /** Кто тренировался; null — запуск с пульта дорожки, можно переназначить. */
+    /** Who trained; null — started from the treadmill console, can be reassigned. */
     val profileId: String? = null,
-    /** Программы, пройденные до конца в этой тренировке. */
+    /** Programs completed in full during this workout. */
     val programsDone: List<String> = emptyList(),
     val metrics: SessionMetrics? = null,
 )
@@ -54,8 +54,8 @@ private fun SavedSession.summary() =
     SessionSummary(id, stats.movingS, stats.distanceM, stats.kcalCalc, stats.kcalTreadmill, console, profileId, metrics ?: MetricsCalc.of(this, programsDone))
 
 /**
- * История тренировок: по файлу JSON на тренировку (с посекундными сэмплами), хранится бессрочно —
- * нужна для итогов «за всё время». Сводки держим в памяти, чтобы не перечитывать файлы.
+ * Workout history: one JSON file per workout (with per-second samples), kept indefinitely —
+ * needed for "all time" totals. Summaries are kept in memory so files aren't re-read.
  */
 class HistoryStore(private val dir: File) {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }

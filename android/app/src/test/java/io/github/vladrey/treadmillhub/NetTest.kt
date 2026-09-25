@@ -24,7 +24,7 @@ class NetTest {
         assertNull(n.onProbe(t0, true, false))
         assertNull(n.onProbe(t0 + 20_000, true, false))
         assertNull(n.outage)
-        assertNull(n.onProbe(t0 + 40_000, true, true))          // два сбоя подряд — не отключение
+        assertNull(n.onProbe(t0 + 40_000, true, true))          // two failures in a row — not an outage
         assertNull(n.outage)
     }
 
@@ -32,7 +32,7 @@ class NetTest {
         val n = NetTracker(confirm = 3, zone = zone)
         for (i in 0..2) n.onProbe(t0 + i * 20_000L, true, false)
         assertEquals(NetKind.INTERNET, n.outage!!.kind)
-        assertEquals(t0, n.outage!!.startMs)                   // начало — первая неудачная проверка
+        assertEquals(t0, n.outage!!.startMs)                   // start — the first failed check
         val (o, text) = n.onProbe(t0 + 14 * 60_000L, true, true)!!
         assertEquals(t0 + 14 * 60_000L, o.endMs)
         assertTrue(text!!.startsWith("🌐 Интернет вернулся. Не было с 12:00 до 12:14 (14 мин)"))
@@ -47,7 +47,7 @@ class NetTest {
         assertEquals(NetKind.ROUTER, n.outage!!.kind)
         val r = n.onProbe(t0 + 30_000, true, true)!!
         assertEquals(NetKind.ROUTER, r.first.kind)
-        assertNull(r.second)                                    // 30 с — в журнал, но без сообщения
+        assertNull(r.second)                                    // 30 s — logged, but no message
         for (i in 0..3) n.onProbe(t0 + 100_000 + i * 20_000L, false, false)
         assertTrue(n.onProbe(t0 + 3_700_000, true, true)!!.second!!.contains("(1 ч 0 мин)"))
     }
@@ -70,7 +70,7 @@ class NetTest {
         assertEquals("кабель", list[0].link)
         assertNull(list[0].rssi)
         assertTrue(list[0].online)
-        assertEquals("Телефон Дианы", list[1].name)          // имя, данное в роутере, важнее
+        assertEquals("Телефон Дианы", list[1].name)          // the name set in the router takes priority
         assertEquals("5 ГГц", list[1].link)
         assertEquals(-51, list[1].rssi)
         assertNull(list[1].vendor)

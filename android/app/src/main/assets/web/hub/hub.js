@@ -1,5 +1,5 @@
 "use strict";
-// Хаб: состояние телефона-сервера и связи с дорожкой. Предупреждения — только здесь, без уведомлений.
+// Hub: phone-server status and treadmill connection. Warnings shown only here, no notifications.
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);

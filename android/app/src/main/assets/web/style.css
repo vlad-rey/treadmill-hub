@@ -33,7 +33,7 @@ header .grow { flex: 1; }
 .grid4 { grid-template-columns: repeat(4, 1fr); }
 .grid2 { grid-template-columns: 1fr 1fr; }
 
-/* Все нажимаемые кнопки управления — одного размера */
+/* All clickable control buttons are the same size */
 button { font: inherit; color: var(--text); touch-action: manipulation; }
 .btn { height: var(--btn-h); background: var(--card); border: 1px solid var(--line); border-radius: 14px; font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .btn:active { transform: scale(.96); background: #232b34; }
@@ -96,7 +96,7 @@ button { font: inherit; color: var(--text); touch-action: manipulation; }
 .tabs .tl { font-size: 11px; }
 @media (min-width: 900px) { .tabs { max-width: 1000px; } .tabs .ti { font-size: 22px; } .tabs .tl { font-size: 16px; } }
 
-/* --- Награды --- */
+/* --- Rewards --- */
 .rewardCard { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px; margin-bottom: var(--gap); }
 .rewardCard.earned { border-color: #d4a72c; box-shadow: 0 0 18px rgba(255, 196, 0, .25); }
 .rewardCard .rIcon { font-size: 40px; width: 56px; text-align: center; }
@@ -106,7 +106,7 @@ button { font: inherit; color: var(--text); touch-action: manipulation; }
 .bar { height: 10px; background: #0d1115; border-radius: 99px; overflow: hidden; margin: 6px 0 2px; }
 .bar i { display: block; height: 100%; background: linear-gradient(90deg, #2fbf71, #9be15d); border-radius: 99px; }
 .rewardCard.earned .bar i { background: linear-gradient(90deg, #f7b733, #ffd86b); }
-/* Ачивки: плитки в ряду одной высоты (полоска прогресса прижата к низу); грейд — цветная метка под иконкой (не налезает на иконку и название) */
+/* Achievements: tiles in a row are the same height (progress bar pinned to the bottom); grade is a colored label under the icon (doesn't overlap the icon or title) */
 .achGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--gap); }
 .ach {
   display: flex; flex-direction: column; align-items: center; min-width: 0;
@@ -124,7 +124,7 @@ button { font: inherit; color: var(--text); touch-action: manipulation; }
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; overflow: hidden;
   color: var(--muted); font-size: 11.5px; line-height: 1.3; margin: 3px 0 6px;
 }
-/* Полоска прогресса прижата к низу плитки — у всех на одном уровне */
+/* Progress bar is pinned to the bottom of the tile — level with all others */
 .ach .bar { flex: none; width: calc(100% - 8px); height: 5px; margin: auto 0 0; }
 .ach.locked .aIcon { filter: grayscale(1) brightness(.55); border-color: #3a434d; }
 .ach.locked .gradeTag { opacity: .7; }
@@ -147,8 +147,8 @@ button { font: inherit; color: var(--text); touch-action: manipulation; }
 }
 .deliver { margin-top: 6px; height: 36px !important; font-size: 13px !important; padding: 0 10px !important; }
 
-/* --- Праздник --- */
-/* Ниже нижней панели (z 10): СТОП всегда доступен, даже поверх праздника */
+/* --- Celebration --- */
+/* Below the bottom bar (z 10): STOP is always available, even over the celebration */
 .celebrate { position: fixed; inset: 0; z-index: 9; display: grid; place-items: center; background: rgba(8, 10, 14, .78); backdrop-filter: blur(3px); }
 .celebrate canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .celebrateCard { position: relative; width: min(88vw, 440px); text-align: center; background: #151b22; border: 2px solid #d4a72c; border-radius: 26px; padding: 26px 20px 20px; box-shadow: 0 0 60px rgba(255, 196, 0, .35); animation: pop .5s cubic-bezier(.2, 1.6, .4, 1); }
@@ -191,7 +191,7 @@ table { width: 100%; border-collapse: collapse; margin-top: 8px; font-variant-nu
 th, td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--line); }
 th { color: var(--muted); font-weight: 400; }
 
-/* Отсчёт не должен перекрывать и перехватывать нажатие на СТОП */
+/* Countdown must not cover or intercept taps on STOP */
 .countdown { position: fixed; inset: 0; display: grid; place-items: center; font-size: 160px; font-weight: 800; background: rgba(16, 20, 24, .85); pointer-events: none; z-index: 5; }
 .toast { position: fixed; left: 12px; right: 12px; bottom: calc(var(--action-h) + 40px); max-width: 696px; margin: 0 auto; background: #3b1a1c; color: #ffd0d2; padding: 12px 14px; border-radius: 12px; z-index: 11; }
 .hidden { display: none !important; }
@@ -200,7 +200,7 @@ dialog { background: var(--card); color: var(--text); border: 1px solid var(--li
 dialog label { display: flex; flex-direction: column; gap: 4px; margin: 12px 0; color: var(--muted); }
 dialog input { font: inherit; font-size: 20px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
 
-/* --- Компьютер / планшет в ландшафте: на всю ширину, крупно, в две колонки --------------- */
+/* --- Desktop / tablet landscape: full width, large, two columns --------------- */
 @media (min-width: 900px) {
   :root { --btn-h: clamp(72px, 9vh, 104px); --action-h: clamp(84px, 10vh, 120px); --gap: 14px; }
   html, body { font-size: 20px; }
@@ -252,13 +252,13 @@ dialog input { font: inherit; font-size: 20px; padding: 10px; border-radius: 10p
   .wideDlg { width: min(96vw, 900px); }
 }
 
-/* Невысокие экраны: чуть компактнее, чтобы всё помещалось без прокрутки */
+/* Short screens: slightly more compact so everything fits without scrolling */
 @media (max-height: 760px) and (max-width: 899px) {
   :root { --btn-h: 52px; --action-h: 68px; }
   .metric.big b { font-size: 46px; }
 }
 
-/* Общая шапка всех страниц: на всю ширину, прилипает к верху */
+/* Shared header for all pages: full width, sticks to the top */
 .sitebar {
   position: sticky; top: 0; z-index: 8; width: 100vw; margin: calc(-1 * max(10px, env(safe-area-inset-top))) 0 12px calc(50% - 50vw);
   padding-top: env(safe-area-inset-top); background: rgba(21, 26, 32, .92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line);

@@ -1,76 +1,76 @@
-# Этап 0. Разведка: чек-лист
+# Stage 0. Recon: checklist
 
-Цель: узнать, какие BLE-сервисы у дорожки и какие команды отправляет приложение FitShow.
+Goal: find out which BLE services the treadmill has and which commands the FitShow app sends.
 
-> Разблокировка загрузчика Redmi 6 стирает телефон. Всё, что снято здесь до разблокировки, сразу копируйте на PC.
+> Unlocking the Redmi 6 bootloader wipes the phone. Copy everything captured here to the PC before unlocking.
 
-## 0.1. Информация о телефоне
+## 0.1. Phone information
 
-- [ ] Настройки → О телефоне: версия MIUI, версия Android. Записать в `docs/PLAN.md` → «Открытые вопросы».
+- [ ] Settings → About phone: MIUI version, Android version. Record it in `docs/PLAN.md` → "Open questions".
 
-## 0.2. Сервисы дорожки (nRF Connect)
+## 0.2. Treadmill services (nRF Connect)
 
-1. Установить **nRF Connect for Mobile** (Nordic Semiconductor) на Redmi 6 или Pixel.
-2. Включить дорожку. Отключить её от других приложений (FitShow закрыть).
-3. SCANNER → найти дорожку (имя, скорее всего, начинается с `FS-` или похоже на модель) → CONNECT.
-4. Сделать скриншоты списка сервисов и характеристик (раскрыть каждый сервис).
-5. Ответить:
-   - [ ] Имя устройства и MAC-адрес.
-   - [ ] Есть ли сервис `0x1826` (Fitness Machine)? Если да — какие характеристики (`2ACD` Treadmill Data, `2AD9` Control Point, `2AD4` Supported Speed Range, `2AD5` Supported Inclination Range).
-   - [ ] Есть ли сервис `FFF0` с `FFF1` / `FFF2`?
-   - [ ] Прочие сервисы (`180A` Device Information — прочитать производителя, модель, версию прошивки).
+1. Install **nRF Connect for Mobile** (Nordic Semiconductor) on the Redmi 6 or a Pixel.
+2. Turn on the treadmill. Disconnect it from other apps (close FitShow).
+3. SCANNER → find the treadmill (the name likely starts with `FS-` or resembles the model name) → CONNECT.
+4. Take screenshots of the service and characteristic list (expand each service).
+5. Answer:
+   - [ ] Device name and MAC address.
+   - [ ] Is there a `0x1826` (Fitness Machine) service? If so, which characteristics (`2ACD` Treadmill Data, `2AD9` Control Point, `2AD4` Supported Speed Range, `2AD5` Supported Inclination Range).
+   - [ ] Is there an `FFF0` service with `FFF1` / `FFF2`?
+   - [ ] Other services (`180A` Device Information — read the manufacturer, model, firmware version).
 
-## 0.3. Запись обмена FitShow (HCI snoop log)
+## 0.3. Recording the FitShow exchange (HCI snoop log)
 
-1. Включить режим разработчика: Настройки → О телефоне → 7 раз нажать на «Версия MIUI».
-2. Настройки → Расширенные настройки → Для разработчиков:
-   - включить **Отладка по USB**;
-   - включить **Журнал HCI Bluetooth** (Enable Bluetooth HCI snoop log).
-3. Выключить и включить Bluetooth (чтобы запись началась с чистого листа).
-4. Открыть FitShow, подключиться к дорожке и пройти сценарий. **Между шагами — пауза ~5 секунд**, а время каждого шага записывать (можно голосовой заметкой или на бумаге):
+1. Enable developer mode: Settings → About phone → tap "MIUI version" 7 times.
+2. Settings → Additional settings → Developer options:
+   - enable **USB debugging**;
+   - enable **Bluetooth HCI snoop log** (Enable Bluetooth HCI snoop log).
+3. Turn Bluetooth off and back on (so the recording starts clean).
+4. Open FitShow, connect to the treadmill, and go through the scenario. **Pause ~5 seconds between steps**, and record the time of each step (a voice memo or on paper works):
 
-   | # | Действие |
+   | # | Action |
    |---|---|
-   | 1 | Подключение, ожидание 10 с |
-   | 2 | Старт в ручном режиме |
-   | 3 | Скорость +1 шаг ×3 |
-   | 4 | Скорость −1 шаг ×3 |
-   | 5 | Задать скорость конкретным значением (если приложение умеет) |
-   | 6 | Наклон +1 ×3 |
-   | 7 | Наклон −1 ×3 |
-   | 8 | Пауза, затем продолжить |
-   | 9 | Стоп |
-   | 10 | Запуск встроенной программы из FitShow (если есть), 1–2 минуты, стоп |
-   | 11 | Запуск программы **с пульта дорожки** при подключённом FitShow, 1 минута, стоп |
-   | 12 | Держаться за пульсовые датчики на поручнях 30 с |
-   | 13 | Отключение |
+   | 1 | Connect, wait 10 s |
+   | 2 | Start in manual mode |
+   | 3 | Speed +1 step ×3 |
+   | 4 | Speed −1 step ×3 |
+   | 5 | Set a specific speed value (if the app supports it) |
+   | 6 | Incline +1 ×3 |
+   | 7 | Incline −1 ×3 |
+   | 8 | Pause, then resume |
+   | 9 | Stop |
+   | 10 | Start a built-in program from FitShow (if available), 1–2 minutes, stop |
+   | 11 | Start a program **from the treadmill console** while FitShow is connected, 1 minute, stop |
+   | 12 | Hold the handrail heart-rate sensors for 30 s |
+   | 13 | Disconnect |
 
-5. Выключить Bluetooth (чтобы лог записался).
-6. Подключить Redmi 6 к PC по USB и снять отчёт (это сделаю я или агент):
+5. Turn off Bluetooth (so the log gets written).
+6. Connect the Redmi 6 to the PC over USB and pull the report (I or an agent will do this):
    ```bash
    adb bugreport protocol/raw/bugreport.zip
    ```
-   Внутри архива: `FS/data/misc/bluetooth/logs/btsnoop_hci.log` (или похожий путь).
+   Inside the archive: `FS/data/misc/bluetooth/logs/btsnoop_hci.log` (or a similar path).
 
-> ⚠️ Сырые логи и bugreport содержат данные всех Bluetooth-устройств телефона и ключи сопряжения. Папка `protocol/raw/` закрыта через `.gitignore`. В репозиторий попадает только отфильтрованный обмен с дорожкой.
+> ⚠️ Raw logs and bugreports contain data for all of the phone's Bluetooth devices and pairing keys. The `protocol/raw/` folder is excluded via `.gitignore`. Only the filtered exchange with the treadmill goes into the repository.
 
-## 0.4. Программы P1–P12
+## 0.4. Programs P1–P12
 
-- [ ] Сфотографировать страницы инструкции с таблицами программ (скорость/наклон по отрезкам). Положить в `docs/manual/` (или прислать в чат).
-- [ ] Если инструкции нет — отметить это, профили снимем с дорожки на этапе 1.
+- [ ] Photograph the manual pages with the program tables (speed/incline per segment). Put them in `docs/manual/` (or send them in chat).
+- [ ] If there's no manual, note that — we'll capture the profiles from the treadmill at stage 1.
 
-## 0.5. ADB по Wi-Fi (до root)
+## 0.5. ADB over Wi-Fi (before root)
 
 ```bash
 adb devices
 adb tcpip 5555
-adb connect <IP-телефона>:5555
+adb connect <phone-IP>:5555
 ```
 
-После перезагрузки телефона до root эти команды придётся повторять с USB.
+After a phone reboot, before rooting, these commands will need to be repeated over USB.
 
-## Результат этапа
+## Stage result
 
-- Скриншоты nRF Connect.
-- `btsnoop_hci.log` + заметки со временем шагов.
-- Таблицы программ или отметка, что их нет.
+- nRF Connect screenshots.
+- `btsnoop_hci.log` plus notes on step timing.
+- Program tables, or a note that none exist.

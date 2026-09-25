@@ -40,7 +40,7 @@ class BotTest {
 
     @Test fun homeWeekMergesOutagesOfBothStations() {
         val outages = listOf(
-            Outage("a", at(22, 14, 5), at(22, 16, 45)), Outage("b", at(22, 14, 6), at(22, 16, 44)), // одно отключение
+            Outage("a", at(22, 14, 5), at(22, 16, 45)), Outage("b", at(22, 14, 6), at(22, 16, 44)), // one outage
             Outage("a", at(24, 20, 0), at(24, 20, 30)),
         )
         val text = r.homeWeek(
@@ -72,15 +72,15 @@ class BotTest {
         val sushi = RewardDef("sushi", "p", "Суши", "🍣", Period.WEEK, 6.0)
         val doll = RewardDef("doll", "p", "Кукла", "🎎", Period.MONTH, 24.0)
         val list = listOf(RewardStatus(sushi, "w", 4.8, false, false, 0), RewardStatus(doll, "m", 13.5, false, false, 0))
-        // Чт 24.09: недельная — да (до конца недели 3 дня), месячная — нет (осталось 6 дней)
+        // Thu 24.09: weekly — yes (3 days left in the week), monthly — no (6 days left)
         val thu = r.rewardReminder("Диана", list, LocalDate.of(2026, 9, 24))!!
         assertTrue(thu, thu.contains("🍣 «Суши»: осталось 1,2 км (пройдено 4,8 из 6), до конца недели 3 дня"))
         assertFalse(thu, thu.contains("Кукла"))
-        assertNull(r.rewardReminder("Диана", list, LocalDate.of(2026, 9, 25)))           // пятница
-        // 29.09 — до конца месяца 1 день; вторник — недельной нет
+        assertNull(r.rewardReminder("Диана", list, LocalDate.of(2026, 9, 25)))           // Friday
+        // 29.09 — 1 day left in the month; Tuesday — no weekly one
         val m = r.rewardReminder("Диана", list, LocalDate.of(2026, 9, 29))!!
         assertTrue(m, m.contains("🎎 «Кукла»: осталось 10,5 км (пройдено 13,5 из 24), до конца месяца 1 день"))
-        // Заработанные не напоминаем
+        // Don't remind about already-earned rewards
         assertNull(r.rewardReminder("Диана", listOf(RewardStatus(sushi, "w", 6.5, true, false, 1)), LocalDate.of(2026, 9, 24)))
         assertTrue(r.rewardReminder("Диана", list, LocalDate.of(2026, 9, 27), force = true)!!.contains("это последний день недели"))
     }
@@ -97,26 +97,26 @@ class BotTest {
     @Test fun deviceRegistryLearnsThenReportsNewDevices() {
         val file = File.createTempFile("devices", ".json").apply { delete() }
         val reg = DeviceRegistry(file, learnMs = 1000)
-        assertTrue(reg.seen(listOf("192.168.50.1" to "04:BB:CC:00:00:01"), 0).isEmpty())       // обучение
+        assertTrue(reg.seen(listOf("192.168.50.1" to "04:BB:CC:00:00:01"), 0).isEmpty())       // learning
         assertTrue(reg.seen(listOf("192.168.50.2" to "04:bb:cc:00:00:02"), 500).isEmpty())
         val fresh = reg.seen(listOf("192.168.50.1" to "04:bb:cc:00:00:01", "192.168.50.77" to "da:11:22:33:44:55"), 2000)
         assertEquals(listOf("da:11:22:33:44:55"), fresh.map { it.mac })
         assertTrue(fresh[0].randomMac)
         assertFalse(reg.all().first { it.mac == "04:bb:cc:00:00:01" }.randomMac)
-        assertTrue(reg.seen(listOf("192.168.50.78" to "da:11:22:33:44:55"), 3000).isEmpty())  // второй раз — не новое
+        assertTrue(reg.seen(listOf("192.168.50.78" to "da:11:22:33:44:55"), 3000).isEmpty())  // second time — not new
         reg.patch("DA:11:22:33:44:55", DevicePatch(name = "Телефон гостя", known = true))
         val d = DeviceRegistry(file).all().first { it.mac == "da:11:22:33:44:55" }
         assertEquals("Телефон гостя", d.name)
         assertEquals("192.168.50.78", d.ip)
         assertTrue(d.known)
         reg.patch("da:11:22:33:44:55", DevicePatch(known = false))
-        assertEquals("Телефон гостя", reg.all().first { it.mac == "da:11:22:33:44:55" }.name) // имя не стёрлось
+        assertEquals("Телефон гостя", reg.all().first { it.mac == "da:11:22:33:44:55" }.name) // name wasn't cleared
         file.delete()
     }
 
     @Test fun stationWifiIsNamedByBluetoothAddress() {
         assertEquals("e8:f6:0a:05:87:f4", DeviceRegistry.wifiMacOfBle("E8:F6:0A:05:87:F6"))
-        assertEquals("14:c1:9f:a1:1b:fe", DeviceRegistry.wifiMacOfBle("14:C1:9F:A1:1C:00")) // перенос через байт
+        assertEquals("14:c1:9f:a1:1b:fe", DeviceRegistry.wifiMacOfBle("14:C1:9F:A1:1C:00")) // byte carry-over
         val file = File.createTempFile("devices", ".json").apply { delete() }
         val reg = DeviceRegistry(file, learnMs = 0)
         reg.seen(listOf("192.168.50.18" to "e8:f6:0a:05:87:f4", "192.168.50.5" to "04:00:00:00:00:05"), 10)

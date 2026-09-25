@@ -10,7 +10,7 @@ import org.junit.Test
 
 private fun hex(s: String) = s.split(" ").map { it.toInt(16).toByte() }.toByteArray()
 
-/** Пакеты записаны с T12B 2026-09-25 (protocol/PROTOCOL.md). */
+/** Packets captured from the T12B on 2026-09-25 (protocol/PROTOCOL.md). */
 class CodecsTest {
     @Test fun treadmillDataIdle() {
         val d = Ftms.parseTreadmillData(hex("8c 05 00 00 00 00 00 00 00 00 00 00 00 ff ff ff 00 00 00"))!!
@@ -23,7 +23,7 @@ class CodecsTest {
     }
 
     @Test fun treadmillDataRunning() {
-        // 3,0 км/ч, наклон 2 %, 1 ккал, 26 с
+        // 3.0 km/h, incline 2 %, 1 kcal, 26 s
         val d = Ftms.parseTreadmillData(hex("8c 05 2c 01 00 00 00 14 00 00 00 01 00 ff ff ff 00 1a 00"))!!
         assertEquals(3.0, d.speedKmh!!, 1e-9)
         assertEquals(2.0, d.inclinePct!!, 1e-9)
@@ -72,7 +72,7 @@ class CodecsTest {
     }
 
     @Test fun fitShowPausedAndDistance() {
-        // пауза во время теста 2026-09-25: 9:27, 720 м, 54,1 ккал
+        // pause during the 2026-09-25 test: 9:27, 720 m, 54.1 kcal
         val s = FitShow.parseStatus(hex("02 51 0a 00 0a 37 02 d0 02 1d 02 23 00 00 00 8a 03"))!!
         assertEquals(FitShow.STATE_PAUSED, s.state)
         assertEquals(567, s.elapsedS)

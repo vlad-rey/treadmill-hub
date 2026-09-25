@@ -6,14 +6,14 @@ import io.github.vladrey.treadmillhub.treadmill.TreadmillState
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 
-/** Расход энергии по метаболическим уравнениям ACSM — см. docs/decisions/0004-calories.md. */
+/** Energy expenditure via ACSM metabolic equations — see docs/decisions/0004-calories.md. */
 object Calories {
     const val REST_VO2 = 3.5
 
-    /** VO₂, мл/кг/мин. Ходьба до [walkMaxKmh], бег от [runMinKmh], между — интерполяция. */
+    /** VO₂, mL/kg/min. Walking up to [walkMaxKmh], running from [runMinKmh], interpolated in between. */
     fun vo2(speedKmh: Double, inclinePct: Double, walkMaxKmh: Double = 6.5, runMinKmh: Double = 8.0): Double {
         if (speedKmh <= 0) return REST_VO2
-        val s = speedKmh * 1000 / 60 // м/мин
+        val s = speedKmh * 1000 / 60 // m/min
         val g = inclinePct / 100
         val walk = REST_VO2 + 0.1 * s + 1.8 * s * g
         val run = REST_VO2 + 0.2 * s + 0.9 * s * g
@@ -24,11 +24,11 @@ object Calories {
         }
     }
 
-    /** Полный расход, ккал/мин (≈ 5 ккал на литр O₂). */
+    /** Total expenditure, kcal/min (≈ 5 kcal per liter of O₂). */
     fun kcalPerMinute(speedKmh: Double, inclinePct: Double, weightKg: Double) =
         vo2(speedKmh, inclinePct) * weightKg / 1000 * 5
 
-    /** Активный расход (без покоя), ккал/мин. */
+    /** Active expenditure (excluding rest), kcal/min. */
     fun activeKcalPerMinute(speedKmh: Double, inclinePct: Double, weightKg: Double) =
         (vo2(speedKmh, inclinePct) - REST_VO2) * weightKg / 1000 * 5
 }
@@ -41,21 +41,21 @@ data class SessionStats(
     val active: Boolean = false,
     val startedAtMs: Long? = null,
     val movingS: Double = 0.0,
-    /** Дистанция: по счётчику дорожки, если он есть (совпадает с пультом), иначе по скорости. */
+    /** Distance: from the treadmill counter if available (matches the console), otherwise from speed. */
     val distanceM: Double = 0.0,
-    /** Дистанция, посчитанная хабом по скорости — для сравнения (на разгонах завышает ~5 %). */
+    /** Distance computed by the hub from speed — for comparison (overshoots by ~5% during accelerations). */
     val distanceCalcM: Double = 0.0,
     val kcalCalc: Double = 0.0,
     val kcalActiveCalc: Double = 0.0,
     val kcalTreadmill: Double? = null,
-    /** Время и дистанция по парам «скорость 0,1 км/ч × наклон 1 %». */
+    /** Time and distance grouped by "speed 0.1 km/h × incline 1%" pairs. */
     val buckets: List<Bucket> = emptyList(),
 )
 
 /**
- * Считает тренировку по сэмплам телеметрии (~1 Гц). Время и калории — по предыдущему сэмплу,
- * поэтому смена скорости/наклона учитывается с точностью до секунды. Дистанция — приростом
- * счётчика дорожки (он обнуляется после СТОП — это учтено); если счётчика нет — по скорости.
+ * Tracks a workout from telemetry samples (~1 Hz). Time and calories use the previous sample,
+ * so speed/incline changes are accounted for to within a second. Distance is accumulated from the
+ * treadmill counter (it resets after STOP — this is handled); if there's no counter, from speed.
  */
 class SessionTracker(private val weightKg: () -> Double) {
     private var stats = SessionStats()
@@ -66,7 +66,7 @@ class SessionTracker(private val weightKg: () -> Double) {
     private var lastTmDist: Int? = null
     private var tmSeen = false
     private var tmDistM = 0.0
-    private val buckets = LinkedHashMap<Pair<Int, Int>, DoubleArray>() // (скорость×10, наклон) → [сек, м]
+    private val buckets = LinkedHashMap<Pair<Int, Int>, DoubleArray>() // (speed×10, incline) → [sec, m]
 
     val current: SessionStats get() = stats
 
@@ -86,7 +86,7 @@ class SessionTracker(private val weightKg: () -> Double) {
 
         if (stats.active) {
             val key = (lastSpeed * 10).roundToInt() to lastIncline.roundToInt()
-            val dt = ((nowMs - lastMs) / 1000.0).coerceIn(0.0, 5.0) // разрыв связи не накручивает время
+            val dt = ((nowMs - lastMs) / 1000.0).coerceIn(0.0, 5.0) // a connection gap doesn't inflate the time
             if (dt > 0 && lastSpeed > 0) {
                 val meters = lastSpeed / 3.6 * dt
                 val w = weightKg()
@@ -101,18 +101,18 @@ class SessionTracker(private val weightKg: () -> Double) {
                 )
             }
 
-            // Счётчик дорожки: FTMS на T12B отдаёт вечный 0 — считаем счётчик настоящим, когда он хоть раз > 0
+            // Treadmill counter: FTMS on the T12B always returns 0 — we treat the counter as real once it's > 0
             val d = s.distanceM
             if (d != null && (d > 0 || tmSeen)) {
                 val prev = lastTmDist
                 val delta = when {
                     prev == null -> 0
                     d >= prev -> d - prev
-                    d < 20 -> d // дорожку остановили и запустили заново — счёт с нуля
+                    d < 20 -> d // treadmill was stopped and started again — counting from zero
                     else -> 0
                 }
                 if (!tmSeen && delta >= 0) {
-                    // Переход с расчёта на счётчик: всё, что было по расчёту, заменяем счётчиком
+                    // Switching from calculated to counter-based: replace everything calculated so far with the counter
                     buckets.values.forEach { it[1] = 0.0 }
                     tmSeen = true
                 }
@@ -129,7 +129,7 @@ class SessionTracker(private val weightKg: () -> Double) {
                 buckets = buckets.map { (k, v) -> Bucket(k.first / 10.0, k.second.toDouble(), v[0], v[1]) },
             )
 
-            // Тренировка закончена: лента стоит и дорожка не на паузе/отсчёте дольше минуты
+            // Workout ended: belt is stopped and the treadmill isn't paused/counting down for over a minute
             val stopped = !moving && s.phase != Phase.PAUSED && s.phase != Phase.COUNTDOWN
             idleSinceMs = if (stopped) idleSinceMs ?: nowMs else null
             if (idleSinceMs != null && nowMs - idleSinceMs!! > 60_000) {
@@ -147,15 +147,15 @@ class SessionTracker(private val weightKg: () -> Double) {
     private var lastTmKcal: Double? = null
     private var tmKcal = 0.0
 
-    /** Калории дорожки копятся за заезд и обнуляются после СТОП — суммируем приросты. */
+    /** Treadmill calories accumulate over the run and reset after STOP — we sum the increments. */
     private fun trackTreadmillKcal(k: Double?): Double? {
         if (k == null) return stats.kcalTreadmill
         val prev = lastTmKcal
         tmKcal += when {
             prev == null -> k
             k >= prev -> k - prev
-            k < 1.0 -> k   // обнуление после СТОП и новый заезд
-            else -> 0.0    // смена источника (FitShow 57,2 → FTMS 57) — не обнуление
+            k < 1.0 -> k   // reset after STOP and a new run
+            else -> 0.0    // source switch (FitShow 57.2 → FTMS 57) — not a reset
         }
         lastTmKcal = k
         return tmKcal

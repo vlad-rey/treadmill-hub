@@ -8,11 +8,11 @@ import java.io.File
 import java.util.UUID
 import kotlin.math.roundToInt
 
-/** Отрезок программы. [inclinePct] = null — наклон не меняется. */
+/** Program segment. [inclinePct] = null — incline is unchanged. */
 @Serializable
 data class Segment(val durationS: Int, val speedKmh: Double, val inclinePct: Double? = null)
 
-/** Блок своей программы: шаги, повторённые [repeat] раз (интервалы). */
+/** Block of a custom program: steps repeated [repeat] times (intervals). */
 @Serializable
 data class Block(val repeat: Int = 1, val steps: List<Segment>)
 
@@ -29,7 +29,7 @@ data class CustomProgram(
 @Serializable
 data class CustomProgramInput(val profileId: String? = null, val name: String, val blocks: List<Block>)
 
-// --- Встроенные программы пульта (таблицы из инструкции) ------------------------------------
+// --- Builtin console programs (tables from the manual) ------------------------------------
 
 @Serializable
 data class BuiltinLevel(val level: Int, val speed: List<Int>, val incline: List<Int>? = null)
@@ -51,22 +51,23 @@ class BuiltinPrograms(jsonText: String) {
     fun get(id: String) = all.firstOrNull { it.id == id }
 
     /**
-     * Время делится на отрезки поровну, как на пульте. Наклон из таблицы — уровень 1–15,
-     * отдаём его как проценты (по FTMS дорожка работает в % 0–15; соответствие проверить).
+     * Time is split evenly across segments, like on the console. Incline from the table is a
+     * level 1–15, which we pass through as percent (the treadmill operates in 0–15% over FTMS;
+     * the correspondence needs verifying).
      */
     fun segments(id: String, level: Int, minutes: Int): List<Segment>? {
         val lv = get(id)?.levels?.firstOrNull { it.level == level } ?: return null
         val n = lv.speed.size
         val total = minutes.coerceIn(5, 99) * 60
         return lv.speed.indices.map { i ->
-            // остаток от деления распределяется по секунде на отрезок: 300 с / 18 → 16 или 17 с
+            // the remainder of the division is spread one second per segment: 300 s / 18 → 16 or 17 s
             val d = (i + 1) * total / n - i * total / n
             Segment(d, lv.speed[i].toDouble(), lv.incline?.getOrNull(i)?.toDouble())
         }
     }
 }
 
-// --- Свои программы (хранятся на хабе, привязаны к профилю) ----------------------------------
+// --- Custom programs (stored on the hub, tied to a profile) ----------------------------------
 
 class ProgramStore(private val file: File) {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
@@ -118,6 +119,6 @@ class ProgramStore(private val file: File) {
     }
 }
 
-/** Скорость программы не выше лимита профиля; шаг 0,1 км/ч. */
+/** Program speed capped at the profile limit; step 0.1 km/h. */
 fun List<Segment>.capSpeed(maxKmh: Double) =
     map { it.copy(speedKmh = ((minOf(it.speedKmh, maxKmh)) * 10).roundToInt() / 10.0) }

@@ -6,15 +6,15 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * Экспорт тренировок: TCX (Strava, Garmin Connect — без координат считается тренировкой на дорожке)
- * и CSV. Накопленная дистанция по сэмплам считается по скорости и масштабируется к итоговой
- * дистанции тренировки (счётчику дорожки), чтобы конец трека совпал с пультом.
+ * Workout export: TCX (Strava, Garmin Connect — with no coordinates it's treated as a treadmill
+ * workout) and CSV. Cumulative distance across samples is computed from speed and scaled to the
+ * workout's final distance (the treadmill's counter), so the track ends in sync with the console.
  */
 object Export {
     private fun iso(ms: Long) = DateTimeFormatter.ISO_INSTANT.format(Instant.ofEpochMilli(ms).truncatedTo(java.time.temporal.ChronoUnit.SECONDS))
     private fun f(x: Double, digits: Int) = String.format(Locale.ROOT, "%.${digits}f", x)
 
-    /** Накопленная дистанция на момент каждого сэмпла, м. */
+    /** Cumulative distance at each sample, m. */
     fun cumulativeDistance(s: SavedSession): List<Double> {
         val raw = ArrayList<Double>(s.samples.size)
         var acc = 0.0
@@ -63,7 +63,7 @@ object Export {
         return sb.toString()
     }
 
-    /** Посекундная запись одной тренировки. */
+    /** Per-second record of a single workout. */
     fun samplesCsv(s: SavedSession): String {
         val dist = cumulativeDistance(s)
         val w = s.weightKg
@@ -82,7 +82,7 @@ object Export {
         return sb.toString()
     }
 
-    /** Все тренировки — одна строка на тренировку. Время — местное. */
+    /** All workouts — one row per workout. Time is local. */
     fun summaryCsv(sessions: List<SessionSummary>, zone: ZoneId = ZoneId.systemDefault()): String {
         val fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(zone)
         val sb = StringBuilder("date,duration_min,distance_km,avg_speed_kmh,kcal_calc,kcal_treadmill\n")

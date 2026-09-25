@@ -16,15 +16,15 @@ data class TreadmillState(
     val phase: Phase = Phase.IDLE,
     val countdown: Int? = null,
     val speedKmh: Double = 0.0,
-    /** Целевой наклон: дорожка сообщает цель, а не фактическое положение деки. */
+    /** Target incline: the treadmill reports the target, not the deck's actual position. */
     val inclinePct: Double = 0.0,
     val elapsedS: Int = 0,
-    /** FTMS Total Distance. На T12B пока всегда 0 — дистанцию считает хаб. */
+    /** FTMS Total Distance. Always 0 on the T12B so far — distance is computed by the hub. */
     val distanceM: Int? = null,
-    /** Калории по данным дорожки (FitShow, шаг 0,1 ккал; иначе FTMS, шаг 1 ккал). */
+    /** Calories from the treadmill (FitShow, 0.1 kcal steps; otherwise FTMS, 1 kcal steps). */
     val kcal: Double? = null,
     val heartRate: Int? = null,
-    /** Нерасшифрованные поля статуса FitShow — для сверки с пультом дорожки. */
+    /** Undecoded FitShow status fields — for cross-checking against the treadmill console. */
     val vendorRaw: List<Int>? = null,
     val updatedAtMs: Long = 0,
 )
@@ -40,11 +40,11 @@ sealed interface Command {
 @Serializable
 data class CommandResult(val ok: Boolean, val message: String)
 
-/** Сырой BLE-пакет для отладки (поток /ws/debug/ble). */
+/** Raw BLE packet for debugging (the /ws/debug/ble stream). */
 @Serializable
 data class BleFrame(val ts: Long, val dir: String, val uuid: String, val hex: String)
 
-/** Состояние BLE-связи с дорожкой — для вкладки «Хаб». */
+/** BLE link state with the treadmill — for the "Hub" tab. */
 @Serializable
 data class LinkInfo(
     val connectedSinceMs: Long? = null,
@@ -69,7 +69,7 @@ object Limits {
     const val MIN_INCLINE_PCT = 0.0
     const val MAX_INCLINE_PCT = 15.0
 
-    /** Проверка команды перед отправкой. [maxSpeedKmh] — лимит из настроек хаба. */
+    /** Validate a command before sending. [maxSpeedKmh] — the limit from the hub settings. */
     fun check(cmd: Command, maxSpeedKmh: Double): String? = when (cmd) {
         is Command.Speed -> when {
             cmd.kmh < MIN_SPEED_KMH -> "скорость ниже минимальной $MIN_SPEED_KMH км/ч"

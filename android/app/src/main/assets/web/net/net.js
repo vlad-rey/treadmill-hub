@@ -1,5 +1,5 @@
 "use strict";
-// Сеть: роутер и интернет (проверка на хабе каждые 20 с), журнал сбоев.
+// Network: router and internet (checked on the hub every 20 s), outage log.
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -33,10 +33,10 @@ async function loadLog() {
       const what = o.kind === "ROUTER" ? "📶 Роутер недоступен" : "🌐 Нет интернета";
       return `<div class="warn ${now ? "bad" : ""}">${what}: ${clock(o.startMs)} – ${now ? "сейчас" : hm(o.endMs)} · ${dur((now ? Date.now() : o.endMs) - o.startMs)}</div>`;
     }).join("") : `<p class="muted">Сбоев не было. Сбой засчитывается после трёх неудачных проверок подряд.</p>`;
-  } catch (_) { /* нет связи с хабом */ }
+  } catch (_) { /* no connection to the hub */ }
 }
 
-// --- Роутер ASUS ---------------------------------------------------------------------------
+// --- ASUS router ---------------------------------------------------------------------------
 async function loadRouter() {
   try {
     const r = await (await fetch("/api/router")).json();
@@ -50,7 +50,7 @@ async function loadRouter() {
     if (r.user && document.activeElement !== $("rtUser")) $("rtUser").value = r.user;
     $("routerSummary").textContent = r.configured ? `Логин и пароль (сейчас: ${r.user || "admin"})` : "Логин и пароль администратора роутера";
     if (!r.configured || r.waitingForPassword) $("routerForm").open = true;
-  } catch (_) { /* нет связи с хабом */ }
+  } catch (_) { /* no connection to the hub */ }
 }
 async function saveRouter(password) {
   const r = await fetch("/api/router/credentials", {
@@ -70,7 +70,7 @@ $("routerCreds").addEventListener("submit", (e) => {
 });
 $("rtClear").onclick = () => { if (confirm("Отключить роутер? Хаб забудет пароль.")) saveRouter(null); };
 
-// --- Скорость интернета: замеры роутера --------------------------------------------------
+// --- Internet speed: router measurements --------------------------------------------------
 const f0 = (v) => v == null ? "—" : Math.round(v).toLocaleString("ru-RU");
 let speedPoll = 0;
 async function loadSpeed() {
@@ -91,7 +91,7 @@ async function loadSpeed() {
     $("speedRun").textContent = d.running ? "Идёт замер… (около минуты)" : "Замерить сейчас";
     clearTimeout(speedPoll);
     if (d.running) speedPoll = setTimeout(loadSpeed, 4000);
-  } catch (_) { /* нет связи с хабом */ }
+  } catch (_) { /* no connection to the hub */ }
 }
 function drawSpeed(list) {
   const svg = $("speedChart");
@@ -109,7 +109,7 @@ $("speedRun").onclick = async () => {
   loadSpeed();
 };
 
-// --- Устройства в Wi-Fi: хаб опрашивает сеть раз в 5 мин; новое незнакомое — сообщение в Telegram ---
+// --- Wi-Fi devices: the hub polls the network every 5 min; a new unknown device — message in Telegram ---
 const isRandom = (mac) => (parseInt(mac.slice(0, 2), 16) & 2) === 2;
 function seen(ms) {
   const m = Math.round((Date.now() - ms) / 60e3);
@@ -136,7 +136,7 @@ async function loadDevices() {
           ${x.known ? "" : `<button type="button" class="btn small" data-known="${esc(x.mac)}">Своё</button>`}
         </div>
       </div>`).join("") || `<p class="muted">Пока никого не видно.</p>`;
-  } catch (_) { /* нет связи с хабом */ }
+  } catch (_) { /* no connection to the hub */ }
 }
 async function patchDevice(mac, body) {
   const r = await fetch(`/api/net/devices/${encodeURIComponent(mac)}`, {

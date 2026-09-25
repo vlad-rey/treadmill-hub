@@ -9,7 +9,7 @@ const SPEED_PRESETS = [3, 4, 5, 6, 7, 8, 10, 12, 14, 16];
 let toastTimer = 0;
 let lastSnap = null;
 
-// --- Профиль: хранится на хабе, телефон помнит только свой id -------------------------
+// --- Profile: stored on the hub, the phone only remembers its own id -------------------------
 let profiles = [];
 let me = null;
 const store = {
@@ -56,7 +56,7 @@ $("createProfile").onclick = async (e) => {
 
 $("profileBtn").onclick = openProfileDialog;
 
-// --- Итоги: сегодня / неделя / месяц / всё время ---------------------------------------
+// --- Stats: today / week / month / all time ---------------------------------------
 async function loadStats() {
   if (!me) return;
   const st = await (await fetch("/api/stats?profile=" + encodeURIComponent(me.id))).json();
@@ -82,7 +82,7 @@ function render(snap) {
   const others = snap.ownerName && (!me || snap.ownerProfileId !== me.id) && s.active;
   $("phase").textContent = (PHASES[t.phase] || t.phase) + (others ? " · " + snap.ownerName : "");
 
-  // Тренировка закончилась — обновить итоги
+  // Workout ended — refresh stats
   if (wasActive && !s.active) { loadStats(); if (window.loadHistory) window.loadHistory(); }
   wasActive = s.active;
   $("hr").classList.toggle("hidden", !t.heartRate);
@@ -129,12 +129,12 @@ let presetsFor = null;
 function renderPresets(max) {
   if (presetsFor === max) return;
   presetsFor = max;
-  // Один ряд из 4 кнопок: самые ходовые скорости в пределах лимита
+  // One row of 4 buttons: the most common speeds within the limit
   const values = SPEED_PRESETS.filter((v) => v <= max).slice(0, 4);
   $("speedPresets").innerHTML = values.map((v) => `<button class="btn" data-act="speed" data-v="${v}">${v}</button>`).join("");
 }
 
-// --- Нижняя панель: СТАРТ или ПАУЗА|СТОП ---------------------------------------------
+// --- Bottom bar: START or PAUSE|STOP ---------------------------------------------
 let mainMode = null;
 let mainLockedUntil = 0;
 
@@ -143,7 +143,7 @@ function renderActions(t, connected) {
   const mode = active ? "stop" : "start";
   const main = $("mainBtn"), pause = $("pauseBtn");
   if (mode !== mainMode) {
-    // смена СТАРТ ↔ СТОП: секунда блокировки от случайного двойного нажатия
+    // switching START ↔ STOP: one-second lock against an accidental double tap
     if (mainMode !== null) mainLockedUntil = Date.now() + 1000;
     mainMode = mode;
     main.dataset.act = mode;
@@ -151,14 +151,14 @@ function renderActions(t, connected) {
   }
   const showPause = t.phase === "RUNNING" || t.phase === "PAUSED";
   main.className = "action " + mode + (active && !showPause ? " solo" : "");
-  main.disabled = mode === "start" && !connected; // СТОП доступен всегда
+  main.disabled = mode === "start" && !connected; // STOP is always available
 
   pause.classList.toggle("hidden", !showPause);
   pause.dataset.act = t.phase === "PAUSED" ? "start" : "pause";
   pause.textContent = t.phase === "PAUSED" ? "ДАЛЬШЕ" : "ПАУЗА";
 }
 
-// --- Экран: полный экран и запрет засыпания -------------------------------------------
+// --- Screen: fullscreen and keep-awake -------------------------------------------
 function inFullscreen() {
   return document.fullscreenElement || matchMedia("(display-mode: fullscreen), (display-mode: standalone)").matches;
 }
@@ -173,7 +173,7 @@ syncFullscreenBtn();
 
 let wakeLock = null;
 async function keepScreenOn(on) {
-  // Screen Wake Lock работает только в защищённом контексте (HTTPS или флаг Chrome, см. docs)
+  // Screen Wake Lock only works in a secure context (HTTPS or a Chrome flag, see docs)
   if (!("wakeLock" in navigator)) return;
   try {
     if (on && !wakeLock) {
@@ -182,10 +182,10 @@ async function keepScreenOn(on) {
     } else if (!on && wakeLock) {
       await wakeLock.release();
     }
-  } catch (_) { /* нет разрешения — экран может погаснуть */ }
+  } catch (_) { /* no permission — screen may turn off */ }
 }
 
-// --- Команды ----------------------------------------------------------------------
+// --- Commands ----------------------------------------------------------------------
 function toast(msg) {
   const el = $("toast");
   el.textContent = msg;
@@ -195,7 +195,7 @@ function toast(msg) {
 }
 
 async function control(action, value, extra = {}) {
-  // Тренировка записывается на того, кто нажал СТАРТ — без профиля не начинаем
+  // The workout is logged to whoever pressed START — we don't start without a profile
   if ((action === "start" || action === "program") && !me) { openProfileDialog(); return false; }
   try {
     const r = await fetch("/api/control", {
@@ -214,10 +214,10 @@ async function control(action, value, extra = {}) {
 
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-act]");
-  if (b && b.closest("dialog")) return; // кнопки в диалогах обрабатываются отдельно
+  if (b && b.closest("dialog")) return; // buttons in dialogs are handled separately
   if (!b || b.disabled) return;
   if (b.id === "mainBtn" && Date.now() < mainLockedUntil) return;
-  enterFullscreen(); // первое же нажатие убирает адресную строку
+  enterFullscreen(); // the very first tap hides the address bar
   if (navigator.vibrate) navigator.vibrate(15);
   control(b.dataset.act, b.dataset.v == null ? null : Number(b.dataset.v));
 });

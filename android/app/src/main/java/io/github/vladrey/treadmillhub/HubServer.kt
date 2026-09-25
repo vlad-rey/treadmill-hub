@@ -57,18 +57,18 @@ private data class DevicesDto(val devices: List<NetDevice>, val learnUntilMs: Lo
 @Serializable
 private data class SettingInput(val key: String, val value: Int)
 
-/** HTTP + WebSocket API хаба и статика веб-интерфейса из assets/web. */
+/** The hub's HTTP + WebSocket API and static web UI assets from assets/web. */
 class HubServer(private val hub: Hub, private val assets: AssetManager, port: Int) {
     private val engine: ApplicationEngine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
         install(WebSockets) { pingPeriodMillis = 15_000 }
         routing {
-            // Главная — меню; дорожка — /treadmill/, станции — /power/
+            // Home — menu; treadmill — /treadmill/, stations — /power/
             get("/") { call.respondAsset("home/index.html") }
             get("/treadmill/") { call.respondAsset("index.html") }
             for (page in listOf("hub", "net")) get("/$page/") { call.respondAsset("$page/index.html") }
             for (page in listOf("treadmill", "power", "hub", "net")) get("/$page") { call.respondRedirect("/$page/") }
             get("/favicon.ico") { call.respondAsset("favicon-32.png") }
-            // Service worker должен отдаваться из корня, чтобы управлять всем приложением
+            // Service worker must be served from the root to control the whole app
             get("/sw.js") { call.respondAsset("sw.js") }
             get("/static/{path...}") {
                 val path = call.parameters.getAll("path")?.joinToString("/").orEmpty()
@@ -76,13 +76,13 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                 else call.respondAsset(path)
             }
 
-            // Станции Fossibot: состояние, список, настройки
+            // Fossibot stations: status, list, settings
             get("/power/") { call.respondAsset("power/index.html") }
             get("/api/power") { call.respondJson(json.encodeToString(hub.power.list())) }
             get("/api/power/outages") { call.respondJson(json.encodeToString(hub.power.outageList())) }
-            // Сеть: сбои роутера и интернета (текущее состояние — в /api/state → hub.net)
+            // Network: router and internet outages (current state is in /api/state → hub.net)
             get("/api/net/outages") { call.respondJson(json.encodeToString(hub.net.outages())) }
-            // Роутер ASUS: пароль только принимаем, наружу не отдаём
+            // ASUS router: we only accept the password, never expose it
             get("/api/router") { call.respondJson(json.encodeToString(hub.router.status)) }
             post("/api/router/credentials") {
                 val body = runCatching { json.decodeFromString<RouterCredentials>(call.receiveText()) }.getOrNull()
@@ -92,7 +92,7 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                 hub.router.setCredentials(body.user.trim(), body.password)
                 call.respondJson(json.encodeToString(hub.router.status))
             }
-            // Отладка интеграции с роутером: только с самого телефона (adb forward), не из Wi-Fi
+            // Router integration debugging: only from the phone itself (adb forward), not over Wi-Fi
             get("/api/router/debug") {
                 if (call.request.local.remoteAddress !in setOf("127.0.0.1", "::1", "localhost")) {
                     call.respondJson("""{"error":"только локально"}""", HttpStatusCode.Forbidden); return@get
@@ -168,7 +168,7 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                     { call.respondError(it) },
                 )
             }
-            // История веса. У профиля без записей первая запись создаётся из текущего веса.
+            // Weight history. For a profile with no entries, the first entry is created from the current weight.
             get("/api/profiles/{id}/weights") {
                 val p = hub.profiles.get(call.parameters["id"])
                 if (p == null) { call.respondJson("""{"error":"профиль не найден"}""", HttpStatusCode.NotFound); return@get }
@@ -185,7 +185,7 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                 r.fold({ call.respondJson(json.encodeToString(it)) }, { call.respondError(it) })
             }
 
-            // Геймификация: ачивки и реальные награды профиля (свои — видит и владелец хаба)
+            // Gamification: a profile's achievements and real rewards (own — visible to the hub owner too)
             get("/api/game/{profileId}") {
                 val id = call.parameters["profileId"].orEmpty()
                 if (hub.profiles.get(id) == null) call.respondJson("""{"error":"профиль не найден"}""", HttpStatusCode.NotFound)
@@ -213,7 +213,7 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                 call.respondJson("""{"ok":$ok}""", if (ok) HttpStatusCode.OK else HttpStatusCode.NotFound)
             }
 
-            // Программы: встроенные P1–P8 и свои (свои — общие и профиля)
+            // Programs: builtin P1–P8 and custom ones (custom — shared and per-profile)
             get("/api/programs") {
                 val profile = call.request.queryParameters["profile"]
                 val builtins = hub.builtin.all.map { ProgramInfo(it.id, it.name, true, it.levels.size, null) }
@@ -247,7 +247,7 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                 call.respondJson("""{"ok":$ok}""", if (ok) HttpStatusCode.OK else HttpStatusCode.NotFound)
             }
 
-            // Итоги: сегодня / неделя / месяц / всё время. profile пустой — тренировки без владельца
+            // Totals: today / week / month / all time. Empty profile — workouts with no owner
             get("/api/stats") { call.respondJson(json.encodeToString(hub.stats(call.request.queryParameters["profile"]?.ifBlank { null }))) }
 
             get("/api/sessions") {
@@ -255,7 +255,7 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                 val list = hub.history.list().let { all -> if (profile == null) all else all.filter { it.profileId == profile.ifBlank { null } } }
                 call.respondJson(json.encodeToString(list))
             }
-            // Экспорт: все тренировки профиля одной таблицей; одна тренировка — TCX (Strava/Garmin) или CSV
+            // Export: all of a profile's workouts as one table; a single workout — TCX (Strava/Garmin) or CSV
             get("/api/export/sessions.csv") {
                 val profile = call.request.queryParameters["profile"]
                 val list = hub.history.list().filter { profile == null || it.profileId == profile.ifBlank { null } }
@@ -322,7 +322,7 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
 
     private suspend fun io.ktor.server.application.ApplicationCall.respondDownload(body: String, fileName: String, type: ContentType) {
         response.headers.append("Content-Disposition", "attachment; filename=\"$fileName\"")
-        // BOM — чтобы Excel открыл CSV в UTF-8 без кракозябр
+        // BOM — so Excel opens the CSV as UTF-8 without garbled characters
         val bytes = (if (type == ContentType.Text.CSV) "﻿" + body else body).toByteArray(Charsets.UTF_8)
         respondBytes(bytes, type.withParameter("charset", "utf-8"))
     }

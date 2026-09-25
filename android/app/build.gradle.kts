@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "io.github.vladrey.treadmillhub"
-        minSdk = 28 // Redmi 6: Android 9, 32-битный (armeabi-v7a). Нативных библиотек нет.
+        minSdk = 28 // Redmi 6: Android 9, 32-bit (armeabi-v7a). No native libraries.
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
@@ -21,7 +21,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Приложение ставится только на свой телефон — подписываем отладочным ключом
+            // The app is only installed on our own phone — sign with the debug key
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -32,7 +32,7 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
-    // Таблицы встроенных программ — единый источник в protocol/programs
+    // Builtin program tables — single source of truth in protocol/programs
     sourceSets {
         getByName("main") { assets.srcDir("../../protocol/programs") }
     }

@@ -1,121 +1,121 @@
-# План проекта treadmill-hub
+# treadmill-hub project plan
 
-Последнее обновление: 2026-09-24. Итоговые решения утверждает владелец проекта.
+Last updated: 2026-09-24. Final decisions are approved by the project owner.
 
-## 1. Цель
+## 1. Goal
 
-- Видеть в реальном времени: время работы, скорость, наклон (% и градусы), дистанцию (общую и в разбивке по скорости/наклону), **килокалории — с дорожки и собственный расчёт с учётом наклона и веса**.
-- Управлять: скорость ±, наклон ±, старт/пауза/стоп.
-- Запускать встроенные программы дорожки (P1–P12) и собственные программы.
-- Вести историю тренировок для двух пользователей.
-- Дать агентам постоянный доступ к хабу по локальной сети: телеметрия, BLE-пакеты, логи.
+- See in real time: running time, speed, incline (% and degrees), distance (total and broken down by speed/incline), **calories — both from the treadmill and our own calculation accounting for incline and weight**.
+- Control: speed ±, incline ±, start/pause/stop.
+- Run the treadmill's built-in programs (P1–P12) and custom programs.
+- Keep workout history for two users.
+- Give agents permanent access to the hub over the local network: telemetry, BLE packets, logs.
 
-## 2. Оборудование
+## 2. Hardware
 
-| Устройство | Роль | Заметки |
+| Device | Role | Notes |
 |---|---|---|
-| FitLogic T12B | Дорожка | 1–16 км/ч, наклон 0–15 % (≈ 0–8,5°), 12 программ, пульс с поручней. BLE-модуль FitShow |
-| Xiaomi Redmi 6 4/64 (`cereus`, Helio P22) | Хаб, домашний мини-сервер | MIUI Global 11.0.4.0, Android 9 (API 28), **32-битный** (`armeabi-v7a`) → хаб: `minSdk 28`, нативные зависимости только с поддержкой `armeabi-v7a`. Будет с root, см. redmi6-homeserver |
-| Pixel 9, Pixel 10 | Клиенты | Chrome, PWA |
-| PC (Windows, Bluetooth) | Разработка | Стоит рядом с дорожкой: прототип протокола на `bleak` |
+| FitLogic T12B | Treadmill | 1–16 km/h, incline 0–15% (≈ 0–8.5°), 12 programs, heart rate from the handrails. FitShow BLE module |
+| Xiaomi Redmi 6 4/64 (`cereus`, Helio P22) | Hub, home mini-server | MIUI Global 11.0.4.0, Android 9 (API 28), **32-bit** (`armeabi-v7a`) → hub: `minSdk 28`, native dependencies must support `armeabi-v7a`. Will be rooted, see redmi6-homeserver |
+| Pixel 9, Pixel 10 | Clients | Chrome, PWA |
+| PC (Windows, Bluetooth) | Development | Sits next to the treadmill: protocol prototype using `bleak` |
 
-## 3. Принятые решения
+## 3. Decisions made
 
-| # | Решение | ADR |
+| # | Decision | ADR |
 |---|---|---|
-| 1 | Нативный Android-хаб на Redmi 6, клиенты — PWA. Отдельное мобильное приложение не делаем | [0001](decisions/0001-android-hub-and-pwa.md) |
-| 2 | На старте HTTP в локальной сети. Для полноценной PWA — флаг Chrome `unsafely-treat-insecure-origin-as-secure` на обоих Pixel. HTTPS — только если понадобится | [0002](decisions/0002-http-on-lan.md) |
-| 3 | Программы выполняет хаб. Встроенные P1–P12: запуск командой дорожки, если протокол позволяет, иначе копия на хабе. Плюс редактор своих программ | [0003](decisions/0003-programs.md) |
-| 4 | Доступ только из дома, без Tailscale/проброса портов | — |
-| 5 | Монорепозиторий, публичный, MIT. Инфраструктура телефона — в отдельном репозитории | — |
-| 6 | Питание хаба: ограничение заряда через root + ACC (40–80 %). Запасной вариант — умная розетка с локальным API | см. redmi6-homeserver |
-| 7 | Калории: два значения — с дорожки (FTMS/FitShow) и свой расчёт по ACSM (скорость, наклон, вес профиля) | [0004](decisions/0004-calories.md) |
+| 1 | Native Android hub on the Redmi 6, PWA clients. No separate mobile app | [0001](decisions/0001-android-hub-and-pwa.md) |
+| 2 | Start with HTTP on the local network. For a fully installable PWA — the Chrome `unsafely-treat-insecure-origin-as-secure` flag on both Pixels. HTTPS only if needed | [0002](decisions/0002-http-on-lan.md) |
+| 3 | The hub runs programs. Built-in P1–P12: launched via a treadmill command if the protocol allows it, otherwise a copy runs on the hub. Plus a custom program editor | [0003](decisions/0003-programs.md) |
+| 4 | Home-only access, no Tailscale/port forwarding | — |
+| 5 | Public monorepo, MIT. Phone infrastructure lives in a separate repository | — |
+| 6 | Hub power: charge limiting via root + ACC (40–80%). Fallback: a smart plug with a local API | see redmi6-homeserver |
+| 7 | Calories: two values — from the treadmill (FTMS/FitShow) and our own ACSM-based calculation (speed, incline, profile weight) | [0004](decisions/0004-calories.md) |
 
-## 4. Архитектура
+## 4. Architecture
 
-### Хаб (Android, Kotlin)
+### Hub (Android, Kotlin)
 
-- **Foreground service**, стартует при загрузке, держит BLE-соединение и переподключается.
-- `TreadmillBackend` — общий интерфейс с реализациями:
-  - `FitShowBle` — проприетарный протокол FitShow (сервис `FFF0`, notify `FFF1`, write `FFF2`);
-  - `FtmsBle` — стандартный FTMS (`0x1826`), если дорожка его поддерживает;
-  - `Simulator` — виртуальная дорожка для разработки и тестов без риска.
-- **Движок программ**: отрезки «длительность / скорость / наклон», повторы, ручная коррекция во время программы.
-- **Хранилище**: SQLite (Room). Сэмплы раз в секунду: время, скорость, наклон, дистанция, пульс (если есть).
-- **Сервер**: Ktor — REST + WebSocket, раздаёт статику PWA.
-- **Debug API** для агентов: поток сырых BLE-пакетов с расшифровкой, состояние GATT, журнал событий.
-- Статус устройства: заряд, температура батареи, uptime.
+- **Foreground service**, starts on boot, keeps the BLE connection and reconnects.
+- `TreadmillBackend` — a common interface with implementations:
+  - `FitShowBle` — FitShow's proprietary protocol (service `FFF0`, notify `FFF1`, write `FFF2`);
+  - `FtmsBle` — standard FTMS (`0x1826`), if the treadmill supports it;
+  - `Simulator` — a virtual treadmill for development and risk-free testing.
+- **Program engine**: segments of "duration / speed / incline", repeats, manual correction during a program.
+- **Storage**: SQLite (Room). Samples once a second: time, speed, incline, distance, heart rate (if available).
+- **Server**: Ktor — REST + WebSocket, serves the PWA's static files.
+- **Debug API** for agents: raw BLE packet stream with decoding, GATT state, event log.
+- Device status: charge, battery temperature, uptime.
 
 ### PWA (web)
 
-- Vite + TypeScript + лёгкий фреймворк (Svelte или Preact, выбрать на этапе 2), графики — uPlot.
-- Экраны: «Тренировка», «Программы», «История», «Хаб» (состояние сервера и связи; предупреждения только там, без уведомлений — решение владельца). Телефон — одна колонка; компьютер (≥ 900 px) — две колонки на всю ширину, крупно.
-- Профили: два пользователя, у каждого — вес (для калорий), лимит скорости, свои программы, своя история. Без паролей (только домашняя сеть).
+- Vite + TypeScript + a lightweight framework (Svelte or Preact, to be chosen at stage 2), charts via uPlot.
+- Screens: "Workout", "Programs", "History", "Hub" (server and connection status; warnings live only there, no notifications — owner's decision). Phone — single column; computer (≥ 900 px) — two columns, full width, large.
+- Profiles: two users, each with weight (for calories), speed limit, own programs, own history. No passwords (home network only).
 
-### API (черновик)
+### API (draft)
 
-| Метод | Путь | Назначение |
+| Method | Path | Purpose |
 |---|---|---|
-| WS | `/ws/live` | Телеметрия и состояние программы в реальном времени |
+| WS | `/ws/live` | Real-time telemetry and program state |
 | POST | `/api/control` | `start` / `pause` / `stop` / `speed` / `incline` |
-| GET/POST | `/api/programs` | Список и редактирование программ |
-| POST | `/api/programs/{id}/run` | Запуск программы для профиля |
-| GET | `/api/sessions`, `/api/sessions/{id}` | История и детали тренировки |
-| GET | `/api/stats` | Агрегаты: дистанция по скоростям и наклонам и т. п. |
-| GET | `/api/hub` | Состояние хаба и BLE |
-| WS | `/ws/debug/ble` | Сырые BLE-пакеты (для агентов) |
+| GET/POST | `/api/programs` | List and edit programs |
+| POST | `/api/programs/{id}/run` | Run a program for a profile |
+| GET | `/api/sessions`, `/api/sessions/{id}` | Workout history and details |
+| GET | `/api/stats` | Aggregates: distance by speed and incline, etc. |
+| GET | `/api/hub` | Hub and BLE status |
+| WS | `/ws/debug/ble` | Raw BLE packets (for agents) |
 
-## 5. Безопасность
+## 5. Safety
 
-- Физический ключ безопасности — главный способ остановки. Приложение его не заменяет.
-- Лимит скорости на профиль, плавное изменение скорости, кнопка «СТОП» всегда видна.
-- Режим «Тест» не делаем (решение владельца 2026-09-25): команды движения от агентов — только с подтверждением владельца в чате, см. CLAUDE.md.
-- Если управляющий клиент отключился во время программы, программа продолжает работать на хабе. Остановить её можно с любого клиента или ключом.
+- The physical safety key is the primary way to stop the treadmill. The app does not replace it.
+- Per-profile speed limit, smooth speed changes, "STOP" button always visible.
+- No "Test" mode (owner's decision, 2026-09-25): movement commands from agents require the owner's confirmation in chat, see CLAUDE.md.
+- If the controlling client disconnects during a program, the program keeps running on the hub. It can be stopped from any client or with the safety key.
 
-## 6. Доступ агентов
+## 6. Agent access
 
-- ADB по Wi-Fi (после root — автоматически при загрузке).
-- HTTP/WS debug API хаба.
-- HCI snoop log для анализа обмена FitShow ↔ дорожка.
-- MCP-сервер не делаем (решение владельца 2026-09-25).
+- ADB over Wi-Fi (automatic on boot, once rooted).
+- HTTP/WS hub debug API.
+- HCI snoop log for analyzing the FitShow ↔ treadmill exchange.
+- No MCP server (owner's decision, 2026-09-25).
 
-## 7. Этапы
+## 7. Stages
 
-| # | Этап | Результат |
+| # | Stage | Result |
 |---|---|---|
-| 0 | **Разведка** | nRF Connect: список сервисов, есть ли FTMS. Запись HCI-логов FitShow по сценарию. Таблицы программ P1–P12. См. [stage-0-checklist.md](stage-0-checklist.md) |
-| 1 | **Протокол** | `protocol/PROTOCOL.md`, декодер с тестами на записанных пакетах, прототип управления с PC на `bleak` |
-| 2 | **Хаб MVP** ✅ 2026-09-25 | APK: подключение по FTMS, телеметрия, калории (дорожка + ACSM), REST/WS, простая страница с ± и СТОП, debug API, симулятор, автозапуск через Magisk |
-| 3 | **PWA и история** ✅ профили, история, итоги, PWA-манифест, вкладка «Хаб»; отдельного этапа дизайна не будет | Профили, тренировки, статистика, графики, установка PWA |
-| 4 | **Программы** ✅ 2026-09-25 (проверено на дорожке: P2 ур. 1, 5 мин) | Движок, встроенные P1–P12, редактор своих программ с повторами, профиль на графике, фиксация запуска с пульта дорожки |
-| 6 | **Геймификация** ✅ 2026-09-25 | 31 ачивка (5 грейдов, секретные), реальные награды по профилям (неделя/месяц, повторяются) с окном, звуком, фейерверком в момент достижения, прогресс близких, «вручено», Telegram владельцу |
-| 5 | **Доработки** ✅ 2026-09-25 | Детали тренировки, смена владельца, копирование встроенной программы, экспорт (CSV, TCX для Strava/Garmin), история веса с еженедельным вопросом |
-| 7 | **Станции Fossibot F2400** ✅ 2026-09-26 | Две станции по BLE с хаба: заряд, мощности, свет есть/нет → Telegram (с защитой от дребезга, предупреждения 20/10 %), безопасные настройки, страница `/power/`, статистика по дням → неделя/месяц/квартал/год/всё (циклы, % заряда/разряда, энергия, отключения) |
-| 8 | **Домашний хаб** ✅ 2026-09-26 | Главная с плитками, общая шапка и иконка, страницы `/hub/` и `/net/`; журнал отключений света; сеть: роутер и интернет каждые 20 с, журнал сбоев, устройства в Wi-Fi (обучение сутки, новые — в Telegram, Wi-Fi станций по BLE-адресу); Telegram: очередь с повтором, бот с командами и доступом по разрешению владельца, недельные отчёты и напоминания о наградах |
-| 9 | **Роутер ASUS RT-BE58U** ✅ 2026-09-26 | Вход как приложение ASUS Router (веб-админку владельца не выкидывает — проверено), клиенты с именами и диапазоном, трафик WAN, встроенный замер Ookla в 7:00 и 21:00 с графиком и сообщением о падении скорости. Первый замер: 895 ↓ / 848 ↑ Мбит/с |
+| 0 | **Recon** | nRF Connect: list of services, whether FTMS is present. Recording FitShow HCI logs per scenario. P1–P12 program tables. See [stage-0-checklist.md](stage-0-checklist.md) |
+| 1 | **Protocol** | `protocol/PROTOCOL.md`, decoder with tests against recorded packets, control prototype on the PC using `bleak` |
+| 2 | **Hub MVP** done 2026-09-25 | APK: FTMS connection, telemetry, calories (treadmill + ACSM), REST/WS, a simple page with ± and STOP, debug API, simulator, autostart via Magisk |
+| 3 | **PWA and history** done — profiles, history, totals, PWA manifest, "Hub" tab; no separate design stage planned | Profiles, workouts, stats, charts, PWA install |
+| 4 | **Programs** done 2026-09-25 (verified on the treadmill: P2 level 1, 5 min) | Engine, built-in P1–P12, custom program editor with repeats, profile shown on the chart, recording launches started from the treadmill console |
+| 6 | **Gamification** done 2026-09-25 | 31 achievements (5 tiers, secret ones), per-profile real-world rewards (weekly/monthly, recurring) with a popup, sound, fireworks on achievement, progress toward the next one, "delivered" marking, Telegram to the owner |
+| 5 | **Refinements** done 2026-09-25 | Workout details, owner reassignment, copying a built-in program, export (CSV, TCX for Strava/Garmin), weight history with a weekly prompt |
+| 7 | **Fossibot F2400 stations** done 2026-09-26 | Two stations over BLE from the hub: charge, power, power-outage detection → Telegram (debounced, 20/10% warnings), safe settings, `/power/` page, daily stats → week/month/quarter/year/all (cycles, charge/discharge %, energy, outages) |
+| 8 | **Home hub** done 2026-09-26 | Home page with tiles, shared header and icon, `/hub/` and `/net/` pages; power outage log; network: router and internet checked every 20 s, outage log, Wi-Fi device list (one-day learning period, new devices reported to Telegram, station Wi-Fi identified by BLE address); Telegram: retry queue, bot with commands and owner-granted access, weekly reports and reward reminders |
+| 9 | **ASUS RT-BE58U router** done 2026-09-26 | Logs in as the ASUS Router app (verified it doesn't kick out the owner's web admin session), clients with names and IP range, WAN traffic, built-in Ookla speed test at 7:00 and 21:00 with a chart and a slowdown alert. First measurement: 895 ↓ / 848 ↑ Mbps |
 
-Параллельно идёт подготовка телефона (разблокировка, root, ACC, Termux) — в redmi6-homeserver.
+Phone prep (unlocking, root, ACC, Termux) is proceeding in parallel — in redmi6-homeserver.
 
-## Статус этапа 2 (2026-09-25)
+## Stage 2 status (2026-09-25)
 
-- Хаб на Redmi подключается к дорожке по FTMS, телеметрия ~1 Гц, API и WebSocket работают, автозапуск через Magisk (~60 с после загрузки).
-- Веб-интерфейс — без отдельного этапа дизайна, доводится по замечаниям владельца.
-- Управление с хаба на реальной дорожке ещё не проверялось — следующий шаг, только с владельцем у дорожки.
+- The hub on the Redmi connects to the treadmill over FTMS, telemetry at ~1 Hz, API and WebSocket work, autostart via Magisk (~60 s after boot).
+- The web UI has no separate design stage — it's refined based on the owner's feedback.
+- Controlling the real treadmill from the hub hasn't been tested yet — next step, only with the owner at the treadmill.
 
-## 8. Открытые вопросы
+## 8. Open questions
 
-- [ ] Счётчик дистанции дорожки на программе P2 (частая смена скорости, 1–7 км/ч) дал 210 м при 313 м по скорости; на ровных 5 км/ч совпадал. Хаб пишет показание счётчика в каждый сэмпл — сверить с пультом на следующей программе.
+- [ ] The treadmill's distance counter on program P2 (frequent speed changes, 1–7 km/h) gave 210 m versus 313 m computed from speed; at a steady 5 km/h they matched. The hub logs the counter reading in every sample — cross-check against the console on the next program.
 
-- [x] Версия MIUI/Android на Redmi 6: MIUI Global 11.0.4.0, Android 9 (API 28).
-- [x] У дорожки есть **оба**: FTMS (`1826`) с управлением скоростью и наклоном и FitShow (`FFF0`). Модуль FITSHOW FS-BT-D2, прошивка V2.6.3. См. `protocol/PROTOCOL.md`.
-- [ ] Можно ли командой запустить встроенную программу? Сообщает ли дорожка номер программы и отрезка?
-- [x] Таблицы программ — из инструкции: 8 программ P1–P8 × 8 уровней × 18 отрезков → `protocol/programs-t12b.json`. Плюс на пульте: 3 пользовательские (U01–U03), 3 по пульсу (H-1…H-3), Body Fat. Настройки звука в инструкции нет.
-- [x] Пульс с поручней неточный — только показываем, без расчётов (решение владельца).
-- [x] Дорожка почти не учитывает наклон в калориях: +11 % на 10 % против +127 % по ACSM (2026-09-25).
-- [x] При пропаже BLE во время движения дорожка сразу останавливается сама (2026-09-25).
-- [ ] Поведение ручной коррекции в программе: до конца отрезка или смещение до конца программы?
+- [x] MIUI/Android version on the Redmi 6: MIUI Global 11.0.4.0, Android 9 (API 28).
+- [x] The treadmill has **both**: FTMS (`1826`) with speed and incline control, and FitShow (`FFF0`). Module FITSHOW FS-BT-D2, firmware V2.6.3. See `protocol/PROTOCOL.md`.
+- [ ] Can a built-in program be started by command? Does the treadmill report the program and segment number?
+- [x] Program tables — from the manual: 8 programs P1–P8 × 8 levels × 18 segments → `protocol/programs-t12b.json`. Plus on the console: 3 custom (U01–U03), 3 heart-rate-based (H-1…H-3), Body Fat. No sound settings in the manual.
+- [x] Heart rate from the handrails is inaccurate — displayed only, not used in calculations (owner's decision).
+- [x] The treadmill barely accounts for incline in its calorie count: +11% at 10% incline versus +127% by ACSM (2026-09-25).
+- [x] If BLE drops during movement, the treadmill stops itself immediately (2026-09-25).
+- [ ] Manual-correction behavior during a program: does it apply until the end of the segment, or shift the rest of the program?
 
-## 9. Источники
+## 9. Sources
 
-- [qdomyos-zwift](https://github.com/cagnulein/qdomyos-zwift) — открытая реализация FitShow (GPL-3.0; используем только как источник знаний о протоколе).
-- [PR #4919](https://github.com/cagnulein/qdomyos-zwift/pull/4919) — FitShow: `FFF0` / `FFF1` / `FFF2`, опрос ~2 Гц.
+- [qdomyos-zwift](https://github.com/cagnulein/qdomyos-zwift) — an open implementation of FitShow (GPL-3.0; used only as a source of protocol knowledge).
+- [PR #4919](https://github.com/cagnulein/qdomyos-zwift/pull/4919) — FitShow: `FFF0` / `FFF1` / `FFF2`, polled at ~2 Hz.

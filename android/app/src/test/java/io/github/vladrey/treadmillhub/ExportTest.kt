@@ -11,7 +11,7 @@ import org.junit.Test
 import java.time.ZoneId
 
 class ExportTest {
-    // 60 с на 6 км/ч = 100 м по скорости; счётчик дорожки насчитал 95 м
+    // 60 s at 6 km/h = 100 m by speed; the treadmill's own counter read 95 m
     private val session = SavedSession(
         id = 1_790_361_769_000,
         weightKg = 90.0,

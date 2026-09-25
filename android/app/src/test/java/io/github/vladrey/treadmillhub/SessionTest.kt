@@ -12,17 +12,17 @@ import org.junit.Test
 
 class SessionTest {
     @Test fun acsmWalkingFlat() {
-        // 5 км/ч = 83,3 м/мин: VO₂ = 3,5 + 8,33 = 11,83; 70 кг → 4,14 ккал/мин
+        // 5 km/h = 83.3 m/min: VO₂ = 3.5 + 8.33 = 11.83; 70 kg → 4.14 kcal/min
         assertEquals(4.14, Calories.kcalPerMinute(5.0, 0.0, 70.0), 0.01)
     }
 
     @Test fun inclineRaisesWalkingCostSharply() {
-        // +1,8·S·G = +15 мл/кг/мин при 10 % → 9,39 ккал/мин
+        // +1.8·S·G = +15 ml/kg/min at 10 % → 9.39 kcal/min
         assertEquals(9.39, Calories.kcalPerMinute(5.0, 10.0, 70.0), 0.01)
     }
 
     @Test fun runningUsesRunningEquation() {
-        // 10 км/ч = 166,7 м/мин: VO₂ = 3,5 + 33,33 = 36,83; 70 кг → 12,9 ккал/мин
+        // 10 km/h = 166.7 m/min: VO₂ = 3.5 + 33.33 = 36.83; 70 kg → 12.9 kcal/min
         assertEquals(12.89, Calories.kcalPerMinute(10.0, 0.0, 70.0), 0.01)
     }
 
@@ -41,13 +41,13 @@ class SessionTest {
             t += 1_000
         }
         feed(5.0, 0, 0.0)
-        repeat(10) { feed(5.0, 10 * (it + 1), 0.1 * (it + 1)) }  // 100 м, 1,0 ккал
-        feed(0.0, 100, 1.0, Phase.PAUSED)                         // пауза: счётчики стоят
+        repeat(10) { feed(5.0, 10 * (it + 1), 0.1 * (it + 1)) }  // 100 m, 1.0 kcal
+        feed(0.0, 100, 1.0, Phase.PAUSED)                         // pause: counters hold
         feed(0.0, 100, 1.0, Phase.PAUSED)
         feed(5.0, 110, 1.1)
-        feed(0.0, 110, 1.0, Phase.FINISHED)                       // FitShow 1,1 → FTMS 1: не обнуление
-        feed(0.0, 0, 0.0, Phase.IDLE)                             // СТОП: дорожка обнулилась
-        feed(5.0, 10, 0.1)                                        // новый заезд в той же тренировке
+        feed(0.0, 110, 1.0, Phase.FINISHED)                       // FitShow 1.1 → FTMS 1: not a reset
+        feed(0.0, 0, 0.0, Phase.IDLE)                             // STOP: the treadmill reset
+        feed(5.0, 10, 0.1)                                        // a new run within the same workout
         val s = tracker.current
         assertEquals(120.0, s.distanceM, 1e-9)
         assertEquals(1.2, s.kcalTreadmill!!, 1e-9)
@@ -70,7 +70,7 @@ class SessionTest {
         val s = tracker.current
         assertTrue(s.active)
         assertEquals(60.0, s.movingS, 1e-6)
-        assertEquals(100.0, s.distanceM, 1e-6) // 6 км/ч × 60 с
+        assertEquals(100.0, s.distanceM, 1e-6) // 6 km/h × 60 s
         assertEquals(1, s.buckets.size)
         assertEquals(6.0, s.buckets[0].speedKmh, 1e-9)
         assertEquals(5.0, s.buckets[0].inclinePct, 1e-9)
@@ -80,7 +80,7 @@ class SessionTest {
         tracker.onState(stopped, t)
         tracker.onState(stopped, t + 61_000)
         assertFalse(tracker.current.active)
-        // последняя секунда движения до сэмпла с остановкой тоже засчитана; итоги остаются видны
+        // the last second of movement before the stopped sample is counted too; the totals remain visible
         assertEquals(100.0 + 6.0 / 3.6, tracker.current.distanceM, 1e-6)
     }
 }

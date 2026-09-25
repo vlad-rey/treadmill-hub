@@ -12,7 +12,7 @@ fun ByteArray.toHex(): String = joinToString(" ") { "%02x".format(it) }
 
 private fun uuid16(short: String): UUID = UUID.fromString("0000$short-0000-1000-8000-00805f9b34fb")
 
-/** Fitness Machine Service (Bluetooth SIG). Проверено на T12B — см. protocol/PROTOCOL.md. */
+/** Fitness Machine Service (Bluetooth SIG). Verified on the T12B — see protocol/PROTOCOL.md. */
 object Ftms {
     val SERVICE = uuid16("1826")
     val TREADMILL_DATA = uuid16("2acd")
@@ -39,7 +39,7 @@ object Ftms {
         val elapsedS: Int? = null,
     )
 
-    /** Treadmill Data (2ACD). Пакет с флагом More Data (бит 0) скорости не содержит. */
+    /** Treadmill Data (2ACD). A packet with the More Data flag (bit 0) set carries no speed. */
     fun parseTreadmillData(b: ByteArray): TreadmillData? = try {
         val flags = u16(b, 0)
         fun has(bit: Int) = flags and (1 shl bit) != 0
@@ -94,12 +94,12 @@ object Ftms {
     }
 }
 
-/** Проприетарный протокол FitShow: кадр 02 · команда · данные · XOR · 03. */
+/** Proprietary FitShow protocol: frame 02 · command · data · XOR · 03. */
 object FitShow {
     val SERVICE = uuid16("fff0")
     val NOTIFY = uuid16("fff1")
 
-    /** Полезная нагрузка кадра (команда + данные) или null, если кадр битый. */
+    /** Frame payload (command + data), or null if the frame is malformed. */
     fun unwrap(b: ByteArray): ByteArray? {
         if (b.size < 4 || u8(b, 0) != 0x02 || u8(b, b.size - 1) != 0x03) return null
         val payload = b.copyOfRange(1, b.size - 2)
@@ -113,11 +113,11 @@ object FitShow {
         val speedKmh: Double? = null,
         val inclinePct: Double? = null,
         val elapsedS: Int? = null,
-        /** Калории в десятых долях ккал — сверено с пультом (15,7 → «15»). */
+        /** Calories in tenths of a kcal — checked against the console (15.7 → "15"). */
         val kcal: Double? = null,
-        /** Дистанция дорожки, м (шаг 10 м) — сверено с пультом (750 м → «0.7»). */
+        /** Treadmill distance, m (10 m steps) — checked against the console (750 m → "0.7"). */
         val distanceM: Int? = null,
-        /** Поля, смысл которых ещё не ясен (смещения 10, 12). */
+        /** Fields whose meaning is still unclear (offsets 10, 12). */
         val unknown: List<Int>? = null,
     )
 
@@ -127,7 +127,7 @@ object FitShow {
     const val STATE_STOPPING = 0x04
     const val STATE_PAUSED = 0x0a
 
-    /** Кадр статуса 0x51: 00 ожидание, 02 отсчёт, 03 движение, 04 торможение/после стопа, 0a пауза. */
+    /** Status frame 0x51: 00 idle, 02 countdown, 03 running, 04 braking/after stop, 0a paused. */
     fun parseStatus(b: ByteArray): Status? {
         val p = unwrap(b) ?: return null
         if (p.isEmpty() || u8(p, 0) != 0x51) return null

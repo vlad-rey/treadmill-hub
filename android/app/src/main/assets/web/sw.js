@@ -1,5 +1,5 @@
-// Service worker: делает интерфейс устанавливаемым как приложение. Данные всегда берутся с хаба;
-// из кэша — только оболочка страницы, если хаб на секунду недоступен.
+// Service worker: makes the UI installable as an app. Data always comes from the hub;
+// the cache only serves the page shell if the hub is briefly unavailable.
 const CACHE = "treadmill-shell-v15";
 const SHELL = ["/", "/treadmill/", "/power/", "/static/home/home.css", "/static/home/home.js", "/static/favicon.svg", "/static/sitebar.js", "/static/style.css", "/static/app.js", "/static/programs.js", "/static/awards.js", "/static/manifest.webmanifest", "/static/icon-192.png"];
 

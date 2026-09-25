@@ -1,5 +1,5 @@
 "use strict";
-// Станции Fossibot: состояние и настройки. Данные — с хаба (/api/power), обновление каждые 3 с.
+// Fossibot stations: status and settings. Data comes from the hub (/api/power), refreshes every 3 s.
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -7,10 +7,10 @@ const CAPACITY_WH = 2048; // Fossibot F2400
 const SPEED_W = { 1: 300, 2: 500, 3: 700, 4: 900, 5: 1100 };
 let stations = [];
 let busy = false;
-let editRows = null; // копия списка для редактирования: фоновое обновление её не трогает
+let editRows = null; // a copy of the list for editing: background refresh doesn't touch it
 const PERIODS = [["today", "День"], ["week", "Неделя"], ["month", "Месяц"], ["quarter", "Квартал"], ["year", "Год"], ["all", "Всё"]];
 let period = "today";
-try { period = localStorage.getItem("powerPeriod") || period; } catch (_) { /* без запоминания */ }
+try { period = localStorage.getItem("powerPeriod") || period; } catch (_) { /* not remembered */ }
 let toastTimer = 0;
 
 function toast(msg, ok) {
@@ -108,7 +108,7 @@ function card(s) {
 }
 
 async function load() {
-  // Не перерисовываем, пока пользователь выбирает значение в списке или идёт запись
+  // Don't re-render while the user is picking a value in a list or a write is in progress
   const a = document.activeElement;
   if (busy || (a && a.tagName === "SELECT" && a.closest("#stations"))) return;
   try {
@@ -120,7 +120,7 @@ async function load() {
   }
 }
 
-// --- Журнал отключений: записи станций об одном отключении (начало в пределах 3 мин) — одной строкой ---
+// --- Outage log: station records about the same outage (started within 3 min) merged into one row ---
 let outageShow = 15;
 function groupOutages(list) {
   const groups = [];
@@ -153,7 +153,7 @@ async function loadOutages() {
     $("outages").innerHTML = groups.length ? groups.slice(0, outageShow).map(outageRow).join("")
       : `<p class="muted">Отключений пока не было. Запись идёт с момента, как хаб начал следить за станциями.</p>`;
     $("moreOutages").classList.toggle("hidden", groups.length <= outageShow);
-  } catch (_) { /* хаб недоступен — покажет load() */ }
+  } catch (_) { /* hub unavailable — load() will show it */ }
 }
 $("moreOutages").onclick = () => { outageShow += 30; loadOutages(); };
 
@@ -179,7 +179,7 @@ document.addEventListener("click", (e) => {
   const per = e.target.closest("[data-period]");
   if (per) {
     period = per.dataset.period;
-    try { localStorage.setItem("powerPeriod", period); } catch (_) { /* без запоминания */ }
+    try { localStorage.setItem("powerPeriod", period); } catch (_) { /* not remembered */ }
     load();
     return;
   }
@@ -196,7 +196,7 @@ document.addEventListener("change", (e) => {
   sel.blur();
 });
 
-// --- Список станций: редактируется копия, на хаб уходит по «Сохранить» ---
+// --- Station list: a copy is edited, sent to the hub on "Save" ---
 function renderRows() {
   $("stationRows").innerHTML = editRows.map((s, i) => `<div class="stRow">
       <input data-i="${i}" data-f="name" value="${esc(s.name)}" placeholder="Имя" maxlength="30" autocomplete="off">

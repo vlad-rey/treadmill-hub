@@ -33,15 +33,15 @@ data class NetState(
     val routerMs: Int? = null,
     val internetMs: Int? = null,
     val checkedAtMs: Long = 0,
-    /** Подтверждённый сбой, который идёт сейчас. */
+    /** Confirmed outage currently in progress. */
     val outage: NetOutage? = null,
 )
 
 /**
- * Решает по результатам проверок, есть ли сбой. Сбой засчитывается после [confirm] неудачных
- * проверок подряд (начало — первая неудачная), заканчивается первой удачной. Если роутер хоть раз
- * не отвечал — сбой «роутер», иначе «интернет» (роутер работал, пропадал провайдер).
- * Возвращает (закрытый сбой, текст для Telegram).
+ * Decides from probe results whether there is an outage. An outage is confirmed after [confirm]
+ * consecutive failed probes (start = the first failed one), and ends on the first successful one. If the
+ * router ever didn't respond — it's a "router" outage, otherwise "internet" (router was up, ISP dropped).
+ * Returns (closed outage, text for Telegram).
  */
 class NetTracker(private val confirm: Int = 3, private val notifyMinMs: Long = 60_000, private val zone: ZoneId = ZoneId.systemDefault()) {
     var outage: NetOutage? = null
@@ -89,7 +89,7 @@ class NetTracker(private val confirm: Int = 3, private val notifyMinMs: Long = 6
     }
 }
 
-/** Раз в [intervalMs] пингует роутер (шлюз Wi-Fi) и проверяет выход в интернет; журнал — net-outages.json. */
+/** Every [intervalMs] pings the router (Wi-Fi gateway) and checks internet access; log — net-outages.json. */
 class NetWatch(private val context: Context, dir: File, private val telegram: Telegram, private val intervalMs: Long = 20_000) {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
     private val file = File(dir, "net-outages.json")
@@ -117,7 +117,7 @@ class NetWatch(private val context: Context, dir: File, private val telegram: Te
         }
     }
 
-    /** Журнал сбоев, новые сверху; идущий сейчас — первым. */
+    /** Outage log, newest first; the one currently in progress comes first. */
     fun outages(limit: Int = 100): List<NetOutage> =
         (listOfNotNull(tracker.outage) + synchronized(log) { log.sortedByDescending { it.startMs } }).take(limit)
 
@@ -133,7 +133,7 @@ class NetWatch(private val context: Context, dir: File, private val telegram: Te
         if (g == 0) null else "${g and 0xFF}.${g shr 8 and 0xFF}.${g shr 16 and 0xFF}.${g shr 24 and 0xFF}"
     }.getOrNull()
 
-    /** ICMP-пинг системной утилитой (обычному приложению разрешено); время ответа, мс, или null. */
+    /** ICMP ping via the system utility (allowed for a regular app); response time, ms, or null. */
     private fun ping(host: String): Int? = runCatching {
         val p = ProcessBuilder("/system/bin/ping", "-c", "2", "-W", "2", host).redirectErrorStream(true).start()
         if (!p.waitFor(6, TimeUnit.SECONDS)) { p.destroy(); return null }
@@ -142,7 +142,7 @@ class NetWatch(private val context: Context, dir: File, private val telegram: Te
         Regex("time=([0-9.]+)").find(out)?.groupValues?.get(1)?.toDouble()?.toInt() ?: 0
     }.getOrNull()
 
-    /** Время TCP-подключения, мс, или null. [refusedOk]: отказ в подключении тоже значит, что узел доступен. */
+    /** TCP connection time, ms, or null. [refusedOk]: a connection refusal also means the host is reachable. */
     private fun tcp(host: String, port: Int, refusedOk: Boolean = false): Int? {
         val t0 = System.nanoTime()
         return try {

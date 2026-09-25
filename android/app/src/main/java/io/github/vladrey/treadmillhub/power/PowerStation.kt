@@ -26,29 +26,29 @@ import java.util.UUID
 
 private const val TAG = "PowerStation"
 
-/** Состояние станции Fossibot F2400 (Sydpower / BrightEMS). */
+/** State of a Fossibot F2400 station (Sydpower / BrightEMS). */
 @Serializable
 data class StationState(
     val connected: Boolean = false,
-    /** Есть ли напряжение сети на входе (свет). null — ещё неизвестно. */
+    /** Whether there's grid voltage on the input (power). null — not yet known. */
     val gridOn: Boolean? = null,
     val gridVoltage: Double? = null,
     val gridHz: Double? = null,
-    /** Мощность зарядки от сети, Вт (reg 3). */
+    /** AC charging power, W (reg 3). */
     val acChargeW: Int = 0,
-    /** Вход всего, Вт (reg 6) — при свете включает сквозное питание нагрузки. */
+    /** Total input, W (reg 6) — with grid power, includes pass-through load power. */
     val inputW: Int = 0,
     val outputW: Int = 0,
     val socPct: Double? = null,
     val updatedAtMs: Long = 0,
-    /** Настройки (holding-регистры) по ключам из [StationSettings]. */
+    /** Settings (holding registers) keyed as in [StationSettings]. */
     val settings: Map<String, Int> = emptyMap(),
     val settingsAtMs: Long = 0,
 )
 
 /**
- * Настройки, которые разрешено менять из интерфейса. Регистры сверены на двух F2400 (2026-09-25).
- * Опасные регистры (68 — авто-выключение: запись 0 выводит станцию из строя) сюда не входят.
+ * Settings allowed to be changed from the UI. Registers verified on two F2400 units (2026-09-25).
+ * Dangerous registers (68 — auto shutdown: writing 0 bricks the station) are not included here.
  */
 object StationSettings {
     class Def(val key: String, val reg: Int, val allowed: (Int) -> Boolean)
@@ -65,14 +65,14 @@ object StationSettings {
         Def("dischargeLimit", 66) { it in 0..500 step 10 },
         Def("chargeLimit", 67) { it in 500..1000 step 10 },
     )
-    /** Только для чтения. */
+    /** Read-only. */
     const val AUTO_OFF_REG = 68
     const val MAX_CHARGE_W_REG = 14
 
     fun byKey(key: String) = all.firstOrNull { it.key == key }
 }
 
-/** Протокол: 11 · функция · … · CRC-16 Modbus (старший байт первым). Регистры с байта 6, big-endian. */
+/** Protocol: 11 · function · … · CRC-16 Modbus (high byte first). Registers starting at byte 6, big-endian. */
 object StationCodec {
     val SERVICE: UUID = UUID.fromString("0000a002-0000-1000-8000-00805f9b34fb")
     val WRITE: UUID = UUID.fromString("0000c304-0000-1000-8000-00805f9b34fb")
@@ -100,7 +100,7 @@ object StationCodec {
     fun read(function: Int) = frame(0x11, function, 0x00, 0x00, 0x00, REGS)
     fun writeOne(reg: Int, value: Int) = frame(0x11, WRITE_ONE, reg shr 8, reg and 0xFF, value shr 8 and 0xFF, value and 0xFF)
 
-    /** Ожидаемая длина ответа по коду функции. */
+    /** Expected response length for a given function code. */
     fun expectedLength(function: Int) = if (function == WRITE_ONE) 8 else 6 + REGS * 2 + 2
 
     fun registers(frame: ByteArray): IntArray? {
@@ -109,7 +109,7 @@ object StationCodec {
     }
 
     fun parseStatus(regs: IntArray, now: Long, prev: StationState): StationState {
-        val v = regs[21] / 10.0   // напряжение сети; без сети — 0 или служебный код
+        val v = regs[21] / 10.0   // grid voltage; 0 or a placeholder code when there's no grid power
         val hz = regs[22] / 100.0
         val grid = v in 150.0..280.0 && hz in 45.0..65.0
         return prev.copy(
@@ -125,7 +125,7 @@ object StationCodec {
     }
 }
 
-/** Одна станция: BLE-соединение, опрос статуса (10 с) и настроек (60 с), запись настроек. */
+/** A single station: BLE connection, status polling (10 s) and settings polling (60 s), writing settings. */
 @SuppressLint("MissingPermission")
 class PowerStation(private val context: Context, val address: String) {
     private val _state = MutableStateFlow(StationState())
@@ -145,7 +145,7 @@ class PowerStation(private val context: Context, val address: String) {
             if (!adapter.isEnabled) { delay(10_000); continue }
             try {
                 manager.connect(adapter.getRemoteDevice(address)).retry(2, 500).useAutoConnect(false).timeout(30_000).suspend()
-                Log.i(TAG, "подключено к станции $address")
+                Log.i(TAG, "connected to station $address")
                 var lastSettings = 0L
                 while (manager.isConnected) {
                     request(StationCodec.READ_INPUT)?.let { regs ->
@@ -163,14 +163,14 @@ class PowerStation(private val context: Context, val address: String) {
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.w(TAG, "станция $address: ${e.message}")
+                Log.w(TAG, "station $address: ${e.message}")
             }
             _state.value = _state.value.copy(connected = false)
             delay(5_000)
         }
     }
 
-    /** Запрос чтения → регистры, или null без ответа за 5 с. Запросы идут строго по одному. */
+    /** Read request → registers, or null with no response within 5 s. Requests are strictly serialized. */
     private suspend fun request(function: Int): IntArray? = io.withLock {
         send(StationCodec.read(function), function)?.let(StationCodec::registers)
     }
@@ -187,7 +187,7 @@ class PowerStation(private val context: Context, val address: String) {
         }
     }
 
-    /** Запись настройки из белого списка с проверкой диапазона и контрольным чтением. */
+    /** Write a whitelisted setting, with range validation and a verification read. */
     suspend fun writeSetting(key: String, value: Int): Result<StationState> {
         val def = StationSettings.byKey(key) ?: return Result.failure(IllegalArgumentException("настройка $key не поддерживается"))
         if (!def.allowed(value)) return Result.failure(IllegalArgumentException("недопустимое значение $value для $key"))
@@ -226,7 +226,7 @@ class PowerStation(private val context: Context, val address: String) {
         }
 
         override fun initialize() {
-            requestMtu(247).enqueue()   // иначе ответ 168 байт приходит кусками по 20
+            requestMtu(247).enqueue()   // otherwise the 168-byte response arrives in 20-byte chunks
             setNotificationCallback(notify).with { _, d -> d.value?.let(::onData) }
             enableNotifications(notify).enqueue()
         }

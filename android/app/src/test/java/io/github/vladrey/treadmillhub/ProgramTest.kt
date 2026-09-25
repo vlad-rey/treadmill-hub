@@ -23,13 +23,13 @@ class ProgramTest {
         val segs = builtin.segments("P2", 8, 30)!!
         assertEquals(18, segs.size)
         assertEquals(30 * 60, segs.sumOf { it.durationS })
-        assertEquals(4.0, segs[0].speedKmh, 0.0)     // P2 ур. 8: скорость 4, 6, 8…
-        assertEquals(5.0, segs[0].inclinePct!!, 0.0) // наклон 5, 7, 9…
-        // 5 минут не делятся на 18 поровну — отрезки по 16–17 с, сумма точно 300 с
+        assertEquals(4.0, segs[0].speedKmh, 0.0)     // P2 level 8: speed 4, 6, 8…
+        assertEquals(5.0, segs[0].inclinePct!!, 0.0) // incline 5, 7, 9…
+        // 5 minutes doesn't split evenly into 18 — segments of 16–17 s, sum exactly 300 s
         val five = builtin.segments("P1", 1, 5)!!
         assertEquals(5 * 60, five.sumOf { it.durationS })
         assertTrue(five.all { it.durationS in 16..17 })
-        assertNull(builtin.segments("P1", 1, 30)!![0].inclinePct) // P1 меняет только скорость
+        assertNull(builtin.segments("P1", 1, 30)!![0].inclinePct) // P1 only changes speed
     }
 
     @Test fun speedIsCappedByProfileLimit() {
@@ -51,11 +51,11 @@ class ProgramTest {
         assertEquals(emptyList<Command>(), r.tick(Phase.COUNTDOWN, 1.0))
         assertEquals(listOf(Command.Speed(4.0), Command.Incline(2.0)), r.tick(Phase.RUNNING, 1.0))
         r.tick(Phase.RUNNING, 1.0)                                    // t=1
-        r.tick(Phase.PAUSED, 1.0)                                     // пауза: время стоит
+        r.tick(Phase.PAUSED, 1.0)                                     // pause: time stands still
         r.tick(Phase.RUNNING, 1.0)                                    // t=2
-        assertEquals(listOf(Command.Speed(6.0)), r.tick(Phase.RUNNING, 1.0)) // t=3 → второй отрезок, наклон не трогаем
+        assertEquals(listOf(Command.Speed(6.0)), r.tick(Phase.RUNNING, 1.0)) // t=3 → second segment, incline untouched
         r.tick(Phase.RUNNING, 1.0)                                    // t=4
-        assertEquals(listOf(Command.Stop), r.tick(Phase.RUNNING, 1.0))       // t=5 → конец
+        assertEquals(listOf(Command.Stop), r.tick(Phase.RUNNING, 1.0))       // t=5 → end
         assertEquals(RunState.DONE, r.state)
     }
 

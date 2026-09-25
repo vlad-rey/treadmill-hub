@@ -6,24 +6,24 @@ import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.roundToInt
 
-/** Метрики одной тренировки для ачивок — считаются из посекундных сэмплов при сохранении. */
+/** Metrics for a single workout, used for achievements — computed from per-second samples on save. */
 @Serializable
 data class SessionMetrics(
     val maxSpeedKmh: Double = 0.0,
-    /** Набор высоты: Σ скорость × время × наклон. */
+    /** Elevation gain: Σ speed × time × incline. */
     val climbM: Double = 0.0,
-    /** Самый длинный непрерывный отрезок на наклоне ≥ 15 %, с. */
+    /** Longest continuous stretch at incline ≥ 15%, s. */
     val maxRunAt15PctS: Double = 0.0,
-    /** Самый длинный непрерывный отрезок на скорости ≤ 1,0 км/ч (в движении), с. */
+    /** Longest continuous stretch at speed ≤ 1.0 km/h (while moving), s. */
     val maxRunAtWalkingMinS: Double = 0.0,
-    /** Самая длинная пауза посреди тренировки (после неё движение продолжилось), с. */
+    /** Longest pause in the middle of a workout (after which movement resumed), s. */
     val maxResumedPauseS: Double = 0.0,
-    /** Целые скорости, на которых шли хотя бы 10 с. */
+    /** Whole-number speeds maintained for at least 10 s. */
     val speedsUsed: List<Int> = emptyList(),
     val startHour: Int = 0,
     val endHour: Int = 0,
     val crossedMidnight: Boolean = false,
-    /** Пройденные до конца программы (id). */
+    /** Programs completed to the end (ids). */
     val programsDone: List<String> = emptyList(),
 )
 

@@ -1,15 +1,15 @@
-# Сырые захваты и отчёты — содержат данные всех BT-устройств и ключи сопряжения
+# Raw captures and reports — contain data for all BT devices and pairing keys
 protocol/raw/
 *.btsnoop
 *.cfa
 bugreport*.zip
 !protocol/captures/*.btsnoop
 
-# Декомпилированные APK
+# Decompiled APKs
 decompiled/
 *.apk
 
-# Локальные настройки и данные
+# Local settings and data
 *.local.*
 .env
 .env.*

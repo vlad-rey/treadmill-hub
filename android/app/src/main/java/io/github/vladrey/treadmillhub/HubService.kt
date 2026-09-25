@@ -17,8 +17,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 
 /**
- * Хаб как foreground service: держит BLE-соединение, сервер и wake lock.
- * При загрузке запускается из Magisk (MIUI не даёт автозапуск приложениям):
+ * The hub as a foreground service: holds the BLE connection, the server, and a wake lock.
+ * On boot it's started from Magisk (MIUI doesn't allow apps to auto-start):
  *   am start-foreground-service -n io.github.vladrey.treadmillhub/.HubService
  */
 class HubService : Service() {
@@ -36,8 +36,8 @@ class HubService : Service() {
 
         wakeLock = getSystemService(PowerManager::class.java)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "treadmillhub:hub").apply { acquire() }
-        // HIGH_PERF: без него Wi-Fi в режиме энергосбережения даёт ~70 КБ/с (установка APK, бэкапы),
-        // а разницы в потреблении замер не показал (−63 мА в обоих режимах, 2026-09-25)
+        // HIGH_PERF: without it, Wi-Fi in power-save mode gives only ~70 KB/s (APK installs, backups),
+        // and measurement showed no difference in power draw (−63 mA in both modes, 2026-09-25)
         @Suppress("DEPRECATION")
         wifiLock = applicationContext.getSystemService(WifiManager::class.java)
             .createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "treadmillhub:wifi").apply { acquire() }
@@ -46,7 +46,7 @@ class HubService : Service() {
         val h = Hub(this, config).also { it.start(scope) }
         hub = h
         server = HubServer(h, assets, config.port).also { it.start() }
-        Log.i("HubService", "хаб запущен: backend=${config.backend}, порт ${config.port}")
+        Log.i("HubService", "hub started: backend=${config.backend}, port ${config.port}")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY

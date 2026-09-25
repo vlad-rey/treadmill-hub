@@ -1,5 +1,5 @@
 "use strict";
-// Общая шапка: часы справа. Разметка шапки — в каждой странице (без мигания при загрузке).
+// Shared header: clock on the right. Header markup lives in each page (to avoid a flash on load).
 (function () {
   const el = document.getElementById("sbClock");
   if (!el) return;

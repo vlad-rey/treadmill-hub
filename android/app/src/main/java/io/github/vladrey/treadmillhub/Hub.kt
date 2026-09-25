@@ -62,7 +62,7 @@ data class HubInfo(
     val charging: Boolean?,
     val weightKg: Double,
     val maxSpeedKmh: Double,
-    /** Зарядка подключена (при ограничителе заряда может быть подключена, но не заряжать). */
+    /** Charger plugged in (with a charge limiter it can be plugged in but not charging). */
     val plugged: Boolean? = null,
     val memAvailMb: Long? = null,
     val memTotalMb: Long? = null,
@@ -79,11 +79,11 @@ data class Snapshot(
     val treadmill: TreadmillState,
     val session: SessionStats,
     val hub: HubInfo,
-    /** Чья сейчас тренировка (тот, кто нажал СТАРТ); null — запуск с пульта. */
+    /** Whose workout this is (whoever pressed START); null — started from the console. */
     val ownerProfileId: String? = null,
     val ownerName: String? = null,
     val program: ProgramStatus? = null,
-    /** Окна наград/ачивок, ещё не подтверждённые на телефоне владельца (клиент фильтрует по своему профилю). */
+    /** Reward/achievement popups not yet acknowledged on the owner's phone (client filters by its own profile). */
     val celebrations: List<Celebration> = emptyList(),
 )
 
@@ -97,7 +97,7 @@ data class ControlRequest(
     val minutes: Int? = null,
 )
 
-/** Связывает дорожку, учёт тренировки и API. Живёт внутри HubService. */
+/** Ties together the treadmill, workout tracking, and the API. Lives inside HubService. */
 class Hub(private val context: Context, val config: HubConfig) {
     val backend: TreadmillBackend =
         if (config.backend == "sim") SimulatorBackend { Limits.MAX_SPEED_KMH } else FtmsBleBackend(context, config)
@@ -122,7 +122,7 @@ class Hub(private val context: Context, val config: HubConfig) {
     private var lastDoneRunner: ProgramRunner? = null
     private var lastLiveCheckMs = 0L
 
-    /** Кто нажал СТАРТ — станет владельцем следующей тренировки. */
+    /** Who pressed START — will become the owner of the next workout. */
     @Volatile private var nextOwner: String? = null
     @Volatile private var owner: String? = null
     private fun weightOf(profileId: String?) = profiles.get(profileId)?.weightKg ?: config.weightKg
@@ -139,7 +139,7 @@ class Hub(private val context: Context, val config: HubConfig) {
             _snapshot.value = _snapshot.value.copy(celebrations = game.store.pending())
         }
         _snapshot.value = _snapshot.value.copy(celebrations = game.store.pending())
-        // Ачивки за уже пройденные тренировки (например, после обновления списка ачивок)
+        // Achievements for already-completed workouts (e.g. after updating the achievement list)
         scope.launch { profiles.all().forEach { p -> runCatching { game.evaluate(p.id) } } }
         backend.start(scope)
         power.start(scope)
@@ -167,16 +167,16 @@ class Hub(private val context: Context, val config: HubConfig) {
                 delay(10_000)
             }
         }
-        // Программа: раз в секунду сверяемся с дорожкой и отправляем команды нового отрезка
+        // Program: check against the treadmill once a second and send commands for the new segment
         scope.launch {
             while (isActive) {
                 delay(1_000)
                 val r = runner ?: continue
                 for (cmd in r.tick(backend.state.value.phase, 1.0)) {
                     val res = backend.command(cmd)
-                    if (!res.ok) android.util.Log.w("Hub", "программа: $cmd — ${res.message}")
+                    if (!res.ok) android.util.Log.w("Hub", "program: $cmd — ${res.message}")
                 }
-                // Программа пройдена до конца — для ачивок «По плану», «Отличник», «Сам себе тренер»
+                // Program completed in full — for the "On plan", "Straight A's", "My own coach" achievements
                 if (r.state == RunState.DONE && r !== lastDoneRunner && tracker.current.active) {
                     lastDoneRunner = r
                     programsDone += r.id
@@ -192,7 +192,7 @@ class Hub(private val context: Context, val config: HubConfig) {
         backend.close()
     }
 
-    /** Посекундная запись тренировки; сохранение раз в минуту и по окончании. */
+    /** Per-second recording of the workout; saved once a minute and at the end. */
     private fun record(s: TreadmillState, session: SessionStats, wasActive: Boolean, now: Long) {
         if (session.active) {
             if (!wasActive) {
@@ -206,7 +206,7 @@ class Hub(private val context: Context, val config: HubConfig) {
                 lastSampleMs = now
             }
             if (now - lastSaveMs >= 60_000) { save(session); lastSaveMs = now }
-            // Реальные награды — в момент достижения, прямо во время тренировки
+            // Real rewards — right when they're earned, during the workout itself
             if (now - lastLiveCheckMs >= 5_000 && backend.name != "sim") {
                 lastLiveCheckMs = now
                 runCatching { game.liveCheck(owner, session.startedAtMs, session.distanceM) }
@@ -214,7 +214,7 @@ class Hub(private val context: Context, val config: HubConfig) {
         } else if (wasActive) {
             save(session)
             if (backend.name != "sim") runCatching { game.evaluate(owner) }
-            // Тренировка закрыта — убираем завершённую программу с экрана
+            // Workout closed — remove the finished program from the screen
             if (runner?.finished == true) {
                 runner = null
                 _snapshot.value = _snapshot.value.copy(program = null)
@@ -223,13 +223,13 @@ class Hub(private val context: Context, val config: HubConfig) {
     }
 
     private fun save(session: SessionStats) {
-        if (backend.name == "sim") return // симулятор — только для проверок, в историю не пишем
+        if (backend.name == "sim") return // simulator — for testing only, not written to history
         val id = session.startedAtMs ?: return
         runCatching {
             val base = SavedSession(id, weightOf(owner), session, samples.toList(), profileId = owner, programsDone = programsDone.toList())
             history.save(base.copy(metrics = MetricsCalc.of(base, base.programsDone)))
         }
-            .onFailure { android.util.Log.w("Hub", "не удалось сохранить тренировку: ${it.message}") }
+            .onFailure { android.util.Log.w("Hub", "failed to save workout: ${it.message}") }
     }
 
     fun stats(profileId: String?) = StatsCalculator.compute(profileId, history.list(), StatsCalculator.now())
@@ -245,7 +245,7 @@ class Hub(private val context: Context, val config: HubConfig) {
             }
             "program" -> return startProgram(req, maxSpeed)
             "programEnd" -> {
-                // Программа прекращается, лента продолжает ехать в ручном режиме
+                // Program is stopped, the belt keeps running in manual mode
                 runner?.cancel()
                 runner?.let { _snapshot.value = _snapshot.value.copy(program = it.status()) }
                 return CommandResult(true, "программа завершена, ручной режим")
@@ -269,14 +269,14 @@ class Hub(private val context: Context, val config: HubConfig) {
             }
             else -> return bad("неизвестное действие ${req.action}")
         }
-        // Лимит скорости — из профиля того, кто отправил команду
+        // Speed limit — from the profile of whoever sent the command
         Limits.check(cmd, maxSpeed)?.let { return bad(it) }
         return backend.command(cmd)
     }
 
     private fun bad(msg: String) = CommandResult(false, msg)
 
-    /** Отрезки программы (встроенной — по уровню и длительности) со скоростью в пределах лимита. */
+    /** Program segments (for a builtin program — by level and duration) with speed capped at the limit. */
     fun programSegments(id: String, level: Int?, minutes: Int?, maxSpeed: Double): List<Segment>? =
         (builtin.segments(id, level ?: 1, minutes ?: builtin.defaultMinutes) ?: programs.get(id)?.segments())?.capSpeed(maxSpeed)
 
@@ -329,14 +329,14 @@ class Hub(private val context: Context, val config: HubConfig) {
         context.getSystemService(android.app.ActivityManager::class.java).getMemoryInfo(it)
     }
 
-    /** Замер скорости по кнопке или команде бота; [done] — после окончания. */
+    /** Speed test triggered by a button or bot command; [done] runs after it finishes. */
     fun runSpeedTest(done: (SpeedResult) -> Unit = {}): Boolean {
         if (speed.running || !router.status.connected) return false
         scope.launch(Dispatchers.IO) { done(speed.run()) }
         return true
     }
 
-    /** Скорость заметно ниже обычной (меньше половины медианы 10 прошлых замеров) — сообщение владельцу. */
+    /** Speed noticeably below normal (less than half the median of the last 10 measurements) — notify the owner. */
     private fun onSpeedResult(r: SpeedResult) {
         val down = r.downMbps ?: return
         val prev = speed.all().dropLast(1).mapNotNull { it.downMbps }.takeLast(10)
@@ -348,7 +348,7 @@ class Hub(private val context: Context, val config: HubConfig) {
 
     fun refreshCelebrations() { _snapshot.value = _snapshot.value.copy(celebrations = game.store.pending()) }
 
-    /** Отметка от скрипта бэкапа на PC (redmi6-homeserver/tools/backup-hub-data.ps1). */
+    /** Mark set by the PC backup script (redmi6-homeserver/tools/backup-hub-data.ps1). */
     fun markBackup() {
         config.lastBackupMs = System.currentTimeMillis()
         _snapshot.value = _snapshot.value.copy(hub = hubInfo())

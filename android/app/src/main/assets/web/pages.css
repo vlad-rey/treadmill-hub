@@ -1,4 +1,4 @@
-/* Отдельные страницы (хаб, сеть): без нижней панели управления */
+/* Standalone pages (hub, network): no bottom control bar */
 body.page { padding-bottom: 32px; }
 body.page main { max-width: 1200px; margin: 0 auto; }
 body.page h3 { margin: 18px 2px 8px; font-size: 14px; font-weight: 500; color: var(--muted); }

@@ -44,7 +44,7 @@
   </nav>
 
   <main>
-    <!-- ТРЕНИРОВКА -->
+    <!-- WORKOUT -->
     <section id="tab-workout" class="tab">
       <section id="programPanel" class="program hidden">
         <div class="progHead">
@@ -97,7 +97,7 @@
       </details>
     </section>
 
-    <!-- ПРОГРАММЫ -->
+    <!-- PROGRAMS -->
     <section id="tab-programs" class="tab hidden">
       <h3>Встроенные программы дорожки</h3>
       <div id="builtinList" class="list"></div>
@@ -106,7 +106,7 @@
       <button id="newProgram" class="btn wide">+ Новая программа</button>
     </section>
 
-    <!-- ИСТОРИЯ -->
+    <!-- HISTORY -->
     <section id="tab-history" class="tab hidden">
       <h3>Вес</h3>
       <div class="stat weightCard">
@@ -121,7 +121,7 @@
       <div id="orphanList" class="list"></div>
     </section>
 
-    <!-- НАГРАДЫ: реальные награды, прогресс близких, ачивки -->
+    <!-- REWARDS: real-world rewards, progress of family members, achievements -->
     <section id="tab-awards" class="tab hidden">
       <div id="myRewards"></div>
       <div id="othersRewards"></div>
@@ -131,7 +131,7 @@
 
   </main>
 
-  <!-- СТАРТ, пока лента стоит; ПАУЗА | СТОП (50/50), пока запущена -->
+  <!-- START while the belt is stopped; PAUSE | STOP (50/50) while running -->
   <footer class="actionbar">
     <button id="pauseBtn" class="action pause hidden" data-act="pause">ПАУЗА</button>
     <button id="mainBtn" class="action start" data-act="start">СТАРТ</button>
@@ -139,7 +139,7 @@
 
   <div id="countdown" class="countdown hidden"></div>
 
-  <!-- Праздник: награда или ачивка посреди экрана -->
+  <!-- Celebration: a reward or achievement in the middle of the screen -->
   <div id="celebrate" class="celebrate hidden">
     <canvas id="fireworks"></canvas>
     <div class="celebrateCard">
@@ -152,7 +152,7 @@
   </div>
   <div id="toast" class="toast hidden"></div>
 
-  <!-- Запуск программы: уровень, длительность, профиль -->
+  <!-- Program launch: level, duration, profile -->
   <dialog id="programDlg">
     <form method="dialog">
       <h2 id="pdName"></h2>
@@ -183,7 +183,7 @@
     </form>
   </dialog>
 
-  <!-- Вес: запись и еженедельный вопрос -->
+  <!-- Weight: logging and the weekly prompt -->
   <dialog id="weightDlg">
     <form method="dialog">
       <h2>Вес</h2>
@@ -197,7 +197,7 @@
     </form>
   </dialog>
 
-  <!-- Подробности тренировки -->
+  <!-- Workout details -->
   <dialog id="sessionDlg" class="wideDlg">
     <form method="dialog">
       <h2 id="sdTitle"></h2>
@@ -220,7 +220,7 @@
     </form>
   </dialog>
 
-  <!-- Редактор своей программы -->
+  <!-- Custom program editor -->
   <dialog id="editorDlg" class="wideDlg">
     <form method="dialog">
       <h2>Своя программа</h2>

@@ -27,15 +27,15 @@ data class ProfileWeek(
     val sessions: Int,
     val kcal: Double,
     val prevKm: Double,
-    /** «🥇 Название» новых ачивок за неделю. */
+    /** "🥇 Name" of new achievements for the week. */
     val achievements: List<String> = emptyList(),
-    /** Недельные награды: (иконка+название, заработана?, км до цели). */
+    /** Weekly rewards: (icon+title, earned?, km to goal). */
     val rewards: List<Triple<String, Boolean, Double>> = emptyList(),
 )
 
 data class StationNow(val name: String, val connected: Boolean, val gridOn: Boolean?, val socPct: Double?, val outputW: Int, val chargeW: Int)
 
-/** Тексты для Telegram: недельные отчёты, напоминания о наградах, /status. Без Android — проверяются тестами. */
+/** Texts for Telegram: weekly reports, reward reminders, /status. No Android dependency — covered by tests. */
 class Reports(private val zone: ZoneId = ZoneId.systemDefault()) {
     private val ru = Locale("ru")
 
@@ -44,7 +44,7 @@ class Reports(private val zone: ZoneId = ZoneId.systemDefault()) {
         return if (from.month == to.month) "${from.dayOfMonth}–${month(to)}" else "${month(from)} – ${month(to)}"
     }
 
-    /** Отчёт владельцу: свет, станции, интернет, скорость, тренировки всех профилей. */
+    /** Report to the owner: power, stations, internet, speed, workouts of all profiles. */
     fun homeWeek(
         from: LocalDate, to: LocalDate,
         stations: List<StationWeek>, outages: List<Outage>, net: List<NetOutage>, speed: List<SpeedResult>, profiles: List<ProfileWeek>,
@@ -97,7 +97,7 @@ class Reports(private val zone: ZoneId = ZoneId.systemDefault()) {
         return sb.toString().trimEnd()
     }
 
-    /** Личная сводка по дорожке за неделю. */
+    /** Personal treadmill summary for the week. */
     fun treadmillWeek(from: LocalDate, to: LocalDate, p: ProfileWeek): String {
         val sb = StringBuilder("🏃 ${p.name}, итоги недели ${weekTitle(from, to)}\n\n")
         if (p.sessions == 0) {
@@ -121,7 +121,7 @@ class Reports(private val zone: ZoneId = ZoneId.systemDefault()) {
         return sb.toString()
     }
 
-    /** Напоминание о незаработанных наградах: недельные — в чт и сб, месячные — за 7, 3 и 1 день до конца месяца. */
+    /** Reminder about unearned rewards: weekly — on Thu and Sat, monthly — 7, 3, and 1 day before month end. */
     fun rewardReminder(name: String, rewards: List<RewardStatus>, today: LocalDate, force: Boolean = false): String? {
         val weekLeft = ChronoUnit.DAYS.between(today, today.with(java.time.temporal.TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY))).toInt()
         val monthLeft = today.lengthOfMonth() - today.dayOfMonth
@@ -171,7 +171,7 @@ class Reports(private val zone: ZoneId = ZoneId.systemDefault()) {
         return sb.toString()
     }
 
-    // --- форматирование ---
+    // --- formatting ---
     private fun runtime(s: StationNow): String {
         val soc = s.socPct ?: return ""
         if (s.outputW <= 5) return ""
@@ -179,7 +179,7 @@ class Reports(private val zone: ZoneId = ZoneId.systemDefault()) {
         return if (h >= 1) " — хватит примерно на ${num(h, 1)} ч" else " — хватит примерно на ${(h * 60).roundToInt()} мин"
     }
 
-    /** Отключения разных станций, начавшиеся в пределах 3 мин, — одно отключение: (начало, конец). */
+    /** Outages of different stations that started within 3 min of each other — treated as one outage: (start, end). */
     fun mergeOutages(list: List<Outage>): List<Pair<Long, Long>> {
         val res = ArrayList<Pair<Long, Long>>()
         for (o in list.filter { it.endMs != null }.sortedBy { it.startMs }) {

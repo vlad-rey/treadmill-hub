@@ -1,7 +1,7 @@
 # tools
 
-Скрипты для PC (Windows):
+Scripts for the PC (Windows):
 
-- `ble/` — прототип протокола на Python + `bleak` (этап 1).
-- `btsnoop/` — парсер и фильтр HCI-логов: оставить только обмен с дорожкой перед коммитом.
-- `adb/` — утилиты для хаба: подключение, логи, установка APK.
+- `ble/` — protocol prototype in Python + `bleak` (stage 1).
+- `btsnoop/` — HCI log parser and filter: keep only the exchange with the treadmill before committing.
+- `adb/` — hub utilities: connecting, logs, installing the APK.

@@ -38,8 +38,8 @@ import kotlin.coroutines.resume
 
 private const val TAG = "TreadmillBle"
 
-/** Дорожка по FTMS (управление) + FitShow FFF1 (фаза, отсчёт, точные калории). */
-@SuppressLint("MissingPermission") // разрешения выдаются через root при установке (tools/deploy-hub.ps1)
+/** Treadmill over FTMS (control) + FitShow FFF1 (phase, countdown, precise calories). */
+@SuppressLint("MissingPermission") // permissions are granted via root at install time (tools/deploy-hub.ps1)
 class FtmsBleBackend(private val context: Context, private val config: HubConfig) : TreadmillBackend {
     override val name = "ftms"
 
@@ -54,7 +54,7 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
     private val pending = ConcurrentHashMap<Int, CompletableDeferred<Ftms.CpResponse>>()
     @Volatile private var hasControl = false
 
-    // Калории приходят из двух источников вперемешку; без разделения значение мигает (0 ↔ нет данных)
+    // Calories arrive interleaved from two sources; without separating them the value flickers (0 ↔ no data)
     @Volatile private var kcalFtms: Double? = null
     @Volatile private var kcalFitShow: Double? = null
     private val kcal get() = kcalFitShow ?: kcalFtms
@@ -73,8 +73,9 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
         private set
 
     /**
-     * Подключение без пауз: попытка ждёт появления дорожки до 30 с, между попытками 2 с.
-     * Дорожку часто обесточивают — после включения в сеть хаб подключается за несколько секунд.
+     * Connection loop with no gaps: each attempt waits for the treadmill to appear for up to 30 s,
+     * with 2 s between attempts. The treadmill is often powered off — once plugged back in, the hub
+     * connects within a few seconds.
      */
     private suspend fun connectLoop() {
         val adapter = context.getSystemService(BluetoothManager::class.java).adapter
@@ -82,7 +83,7 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
         while (kotlinx.coroutines.currentCoroutineContext().isActive) {
             try {
                 if (!adapter.isEnabled) {
-                    Log.w(TAG, "Bluetooth выключен")
+                    Log.w(TAG, "Bluetooth is off")
                     delay(5_000)
                     continue
                 }
@@ -99,16 +100,16 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
                     .useAutoConnect(false)
                     .timeout(30_000)
                     .suspend()
-                Log.i(TAG, "подключено к $address")
+                Log.i(TAG, "connected to $address")
                 link = link.copy(connectedSinceMs = System.currentTimeMillis(), connects = link.connects + 1, address = address)
                 _state.update { it.copy(connection = Connection.CONNECTED) }
                 while (manager.isConnected) delay(500)
-                Log.w(TAG, "соединение потеряно")
+                Log.w(TAG, "connection lost")
                 link = link.copy(connectedSinceMs = null, lastDisconnectMs = System.currentTimeMillis())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.w(TAG, "ошибка подключения: ${e.message}")
+                Log.w(TAG, "connection error: ${e.message}")
             }
             _state.update { it.copy(connection = Connection.DISCONNECTED, speedKmh = 0.0) }
             pending.values.forEach { it.cancel() }
@@ -116,7 +117,7 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
         }
     }
 
-    /** Поиск дорожки по сервису FTMS (нужны разрешение на геолокацию и включённая геолокация на Android 9). */
+    /** Scan for the treadmill by the FTMS service (needs location permission and location enabled on Android 9). */
     private suspend fun scan(adapter: BluetoothAdapter): String? {
         val scanner = adapter.bluetoothLeScanner ?: return null
         _state.update { it.copy(connection = Connection.SCANNING) }
@@ -127,11 +128,11 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
                 val cb = object : ScanCallback() {
                     override fun onScanResult(callbackType: Int, result: ScanResult) {
                         scanner.stopScan(this)
-                        Log.i(TAG, "найдена дорожка ${result.device.address} (${result.scanRecord?.deviceName})")
+                        Log.i(TAG, "found treadmill ${result.device.address} (${result.scanRecord?.deviceName})")
                         if (cont.isActive) cont.resume(result.device.address)
                     }
                     override fun onScanFailed(errorCode: Int) {
-                        Log.w(TAG, "сканирование не удалось: $errorCode")
+                        Log.w(TAG, "scan failed: $errorCode")
                         if (cont.isActive) cont.resume(null)
                     }
                 }
@@ -143,7 +144,7 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
 
     override suspend fun command(cmd: Command): CommandResult {
         if (!manager.isConnected || manager.cp == null) return CommandResult(false, "дорожка не подключена")
-        // Жёсткий предел дорожки; лимит профиля проверяет Hub
+        // Hard treadmill limit; the profile limit is checked by Hub
         Limits.check(cmd, Limits.MAX_SPEED_KMH)?.let { return CommandResult(false, it) }
         val bytes = when (cmd) {
             Command.Start -> Ftms.start()
@@ -152,7 +153,7 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
             is Command.Speed -> Ftms.setSpeed(cmd.kmh)
             is Command.Incline -> Ftms.setIncline(cmd.pct)
         }
-        // Стоп не ждёт в очереди за другими командами
+        // Stop does not wait in the queue behind other commands
         if (cmd == Command.Stop) return sendWithControl(bytes)
         return cpMutex.withLock { sendWithControl(bytes) }
     }
@@ -206,7 +207,7 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
             s.copy(
                 speedKmh = d.speedKmh ?: s.speedKmh,
                 inclinePct = d.inclinePct ?: s.inclinePct,
-                // FTMS Total Distance на T12B всегда 0 — счётчик дорожки приходит в FitShow
+                // FTMS Total Distance is always 0 on the T12B — the treadmill's counter comes via FitShow
                 distanceM = distFitShow ?: d.distanceM ?: s.distanceM,
                 elapsedS = d.elapsedS ?: s.elapsedS,
                 heartRate = if (d.speedKmh != null) d.heartRate else s.heartRate,
@@ -219,7 +220,7 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
     private fun onFitShow(b: ByteArray) {
         emit("rx", FitShow.NOTIFY, b)
         val st = FitShow.parseStatus(b) ?: return
-        // Точные калории и дистанция есть только в движении/паузе/после стопа; в ожидании — сброс
+        // Precise calories and distance are only available while running/paused/after stop; reset while idle
         if (st.kcal != null) kcalFitShow = st.kcal else if (st.state == FitShow.STATE_IDLE) kcalFitShow = null
         if (st.distanceM != null) distFitShow = st.distanceM else if (st.state == FitShow.STATE_IDLE) distFitShow = null
         _state.update { s ->
@@ -289,7 +290,7 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
         }
 
         override fun log(priority: Int, message: String) {
-            // Каждый пакет библиотека пишет на уровне INFO — это ~3 строки в секунду; оставляем только проблемы
+            // The library logs every packet at INFO level — that's ~3 lines per second; keep only problems
             if (priority >= Log.WARN) Log.println(priority, TAG, message)
         }
     }

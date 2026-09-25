@@ -1,24 +1,24 @@
-# 0003. Программы тренировок: встроенные и свои
+# 0003. Workout programs: built-in and custom
 
-Статус: принято, 2026-09-24; уточнено 2026-09-25 — встроенные программы выполняет хаб (FitShow не используем)
+Status: accepted, 2026-09-24; refined 2026-09-25 — the hub runs the built-in programs (FitShow is not used)
 
-## Контекст
+## Context
 
-У T12B 12 встроенных программ. Нужно запускать и их, и собственные программы, видеть прогресс, и чтобы программа не прерывалась при отключении клиента.
+The T12B has 12 built-in programs. We need to run both those and custom programs, see progress, and make sure a program doesn't stop if a client disconnects.
 
-## Решение
+## Decision
 
-- **Свои программы выполняет хаб**: по таймеру отправляет дорожке команды «скорость X, наклон Y». Формат: список отрезков (длительность, скорость, наклон) с повторами.
-- **Встроенные P1–P12**:
-  1. если протокол позволяет запустить программу командой, запускаем её на дорожке, хаб показывает телеметрию;
-  2. иначе переносим таблицы программ из инструкции (или снимаем профиль с дорожки) и выполняем на хабе как обычную программу. Их можно копировать и менять.
-- Если программу запустили с пульта дорожки, хаб всё равно записывает тренировку в историю.
+- **The hub runs custom programs**: on a timer, it sends the treadmill "speed X, incline Y" commands. Format: a list of segments (duration, speed, incline) with repeats.
+- **Built-in P1–P12**:
+  1. if the protocol allows starting a program by command, we start it on the treadmill and the hub just displays telemetry;
+  2. otherwise, we transcribe the program tables from the manual (or capture a profile from the treadmill) and run them on the hub as a regular program. These can be copied and edited.
+- If a program is started from the treadmill's own console, the hub still records the workout in history.
 
-## Последствия
+## Consequences
 
-- Движок программ — часть хаба, клиент только отображает состояние.
-- Для варианта 2 нужны таблицы P1–P12: инструкция или замер.
+- The program engine is part of the hub; the client only displays state.
+- Option 2 requires the P1–P12 tables: from the manual or measured directly.
 
-## Уточнение 2026-09-25
+## 2026-09-25 refinement
 
-Приложение FitShow и его протокол запуска программ не используем. Таблицы P1–P8 (8 уровней × 18 отрезков) взяты из инструкции T12B — `protocol/programs/programs-t12b.json`. Хаб выполняет их как обычные программы: время делится на 18 равных отрезков, скорость ограничивается лимитом профиля, ручная коррекция действует до конца отрезка (как на пульте).
+We don't use the FitShow app or its program-launch protocol. The P1–P8 tables (8 levels × 18 segments) were taken from the T12B manual — `protocol/programs/programs-t12b.json`. The hub runs them as regular programs: the total time is split into 18 equal segments, speed is capped at the profile's limit, and manual correction applies until the end of the segment (as on the console).

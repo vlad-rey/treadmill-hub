@@ -44,11 +44,11 @@ class GameTest {
         game.store.setRewards(diana.id, listOf(RewardDef("sushi", diana.id, "Суши-сет", "🍣", Period.WEEK, 6.0)))
         history.save(session(System.currentTimeMillis() - 3_600_000, 4.0))
 
-        game.liveCheck(diana.id, 42L, 1_500.0)                  // 4 + 1,5 = 5,5 км — ещё нет
+        game.liveCheck(diana.id, 42L, 1_500.0)                  // 4 + 1.5 = 5.5 km — not yet
         assertTrue(game.store.rewardsEarned(diana.id).isEmpty())
 
-        game.liveCheck(diana.id, 42L, 2_100.0)                  // 6,1 км — награда
-        game.liveCheck(diana.id, 42L, 3_000.0)                  // повторно не выдаётся
+        game.liveCheck(diana.id, 42L, 2_100.0)                  // 6.1 km — reward
+        game.liveCheck(diana.id, 42L, 3_000.0)                  // not awarded again
         assertEquals(1, game.store.rewardsEarned(diana.id).size)
         val c = game.store.pending().single()
         assertEquals("reward", c.kind)
@@ -73,9 +73,9 @@ class GameTest {
         val ids = game.store.achievements(diana.id).map { it.achievementId }.toSet()
         assertTrue("first_step" in ids)
         assertTrue("km_5" in ids)
-        assertTrue("climb_100" in ids)          // 5,2 км × 10 % = 520 м
+        assertTrue("climb_100" in ids)          // 5.2 km × 10 % = 520 m
         assertFalse("km_10" in ids)
-        game.evaluate(diana.id)                 // повторно не дублируются
+        game.evaluate(diana.id)                 // not duplicated on a repeat call
         assertEquals(ids.size, game.store.achievements(diana.id).size)
         assertTrue(Achievements.all.size >= 25)
     }

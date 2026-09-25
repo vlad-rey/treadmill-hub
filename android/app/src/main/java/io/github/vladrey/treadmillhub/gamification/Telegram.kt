@@ -17,14 +17,14 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/** [chatId] = null — чат владельца из настроек хаба. */
+/** [chatId] = null — the owner's chat from the hub settings. */
 @Serializable
 data class OutMessage(val atMs: Long, val text: String, val chatId: String? = null)
 
 /**
- * Сообщения владельцу в Telegram. Токен и chat id — в настройках хаба, не в git.
- * Сообщения идут через очередь (сохраняется в [file]): если нет интернета — например, роутер
- * без света, — они уходят позже с пометкой, когда на самом деле случилось событие.
+ * Messages to the owner via Telegram. The token and chat id are in the hub settings, not in git.
+ * Messages go through a queue (persisted to [file]): if there's no internet — e.g. the router
+ * has no power — they are sent later with a note of when the event actually happened.
  */
 class Telegram(
     private val token: () -> String?,
@@ -38,7 +38,7 @@ class Telegram(
     )
     private var worker: Job? = null
 
-    /** Отправить сообщения, оставшиеся в очереди после перезапуска хаба. */
+    /** Send messages left in the queue after the hub restarts. */
     fun start(scope: CoroutineScope) = synchronized(queue) { if (queue.isNotEmpty()) launchWorker(scope) }
 
     fun send(scope: CoroutineScope, text: String) = sendTo(scope, null, text)
@@ -63,8 +63,8 @@ class Telegram(
             val c = m.chatId ?: chatId() ?: return
             val code = post(t, c, withDelayNote(m, System.currentTimeMillis()))
             if (code == 200 || code in 400..499 && code != 429) {
-                // 4xx (кроме «слишком часто») не исправится повтором — не зацикливаемся
-                if (code != 200) Log.w("Telegram", "sendMessage → $code, сообщение пропущено")
+                // 4xx (other than "too many requests") won't be fixed by retrying — don't loop
+                if (code != 200) Log.w("Telegram", "sendMessage → $code, message skipped")
                 synchronized(queue) { if (queue.firstOrNull() === m) queue.removeFirst(); persist() }
                 wait = 15_000L
             } else {
@@ -74,11 +74,11 @@ class Telegram(
         }
     }
 
-    /** Код ответа или -1, если нет связи. */
+    /** Response code, or -1 if there's no connection. */
     private fun post(t: String, c: String, text: String): Int =
         call(t, "sendMessage", mapOf("chat_id" to c, "text" to text))?.first ?: -1
 
-    /** Вызов Bot API (для приёма команд): (код, тело) или null без связи/токена. */
+    /** Call the Bot API (to receive commands): (code, body), or null with no connection/token. */
     fun call(method: String, params: Map<String, String>, readTimeoutMs: Int = 10_000): Pair<Int, String>? =
         token()?.let { call(it, method, params, readTimeoutMs) }
 

@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
 
-/** Виртуальная дорожка: для разработки интерфейса и тестов без риска. Ведёт себя как T12B. */
+/** Virtual treadmill: for UI development and testing without risk. Behaves like the T12B. */
 class SimulatorBackend(private val maxSpeed: () -> Double) : TreadmillBackend {
     override val name = "sim"
     private val _state = MutableStateFlow(TreadmillState(connection = Connection.CONNECTED))

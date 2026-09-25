@@ -23,9 +23,9 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 
 /**
- * Замер скорости встроенным в роутер Ookla Speedtest (как кнопка «Internet Speed» в веб-интерфейсе ASUS):
- * `ookla_speedtest_exe.cgi` → опрос `ookla_speedtest_get_result()` до записи type=result → история роутера
- * (`ookla_speedtest_write_history.cgi`) и своя история speed.json. По расписанию — в [times].
+ * Speed test via the router's built-in Ookla Speedtest (like the "Internet Speed" button in the ASUS web UI):
+ * `ookla_speedtest_exe.cgi` → poll `ookla_speedtest_get_result()` until a type=result entry → router history
+ * (`ookla_speedtest_write_history.cgi`) and our own speed.json history. Scheduled at [times].
  */
 class RouterSpeed(
     private val router: RouterWatch,
@@ -51,7 +51,7 @@ class RouterSpeed(
                 val now = ZonedDateTime.now(zone)
                 val due = times.map { now.toLocalDate().atTime(it).atZone(zone) }.lastOrNull { it <= now } ?: continue
                 val last = all().lastOrNull()?.atMs ?: 0
-                // Замер этого слота ещё не делали и с его начала прошло меньше 2 ч; во время тренировки ждём
+                // This slot's test hasn't run yet and less than 2 h have passed since it started; wait during a workout
                 if (last >= due.toInstant().toEpochMilli() || now.toInstant().toEpochMilli() - due.toInstant().toEpochMilli() > 2 * 3600_000L) continue
                 if (busy()) continue
                 run()
@@ -59,7 +59,7 @@ class RouterSpeed(
         }
     }
 
-    /** Блокирующий замер (~30–60 с); вызывать на Dispatchers.IO. */
+    /** Blocking measurement (~30-60 s); call on Dispatchers.IO. */
     fun run(): SpeedResult {
         synchronized(this) { if (running) return SpeedResult(System.currentTimeMillis(), error = "замер уже идёт"); running = true }
         val started = System.currentTimeMillis()
@@ -92,7 +92,7 @@ class RouterSpeed(
             val items = arr.mapNotNull { it as? JsonObject }
             if (items.any { it["error"] != null }) throw IllegalStateException("роутер не смог провести замер")
             val res = items.firstOrNull { it.s("type") == "result" } ?: continue
-            // Результат прошлого замера (если файл ещё не перезаписан) — пропускаем
+            // Result from a previous test (if the file hasn't been overwritten yet) — skip it
             val ts = res.s("timestamp")?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() }
             if (ts != null && ts < started - 60_000) continue
             saveToRouterHistory(res)
@@ -101,7 +101,7 @@ class RouterSpeed(
         throw IllegalStateException("замер не закончился за 2 мин")
     }
 
-    /** Чтобы замер был виден и в веб-интерфейсе роутера (Adaptive QoS → Internet Speed). */
+    /** So the test result also shows up in the router's web UI (Adaptive QoS → Internet Speed). */
     private fun saveToRouterHistory(res: JsonObject) = runCatching {
         router.use { rt ->
             val old = (rt.hook("ookla_speedtest_get_history();")["ookla_speedtest_get_history"] as? JsonArray)
@@ -115,7 +115,7 @@ class RouterSpeed(
     companion object {
         private fun JsonObject.s(k: String) = this[k]?.let { runCatching { it.jsonPrimitive.content }.getOrNull() }
 
-        /** Строка type=result от Ookla: полоса в байтах/с → Мбит/с. */
+        /** The type=result entry from Ookla: bandwidth in bytes/s → Mbps. */
         fun parseResult(res: JsonObject, atMs: Long): SpeedResult {
             fun bw(k: String) = (res[k] as? JsonObject)?.get("bandwidth")?.jsonPrimitive?.longOrNull?.let { Math.round(it * 8 / 1e5) / 10.0 }
             val ping = (res["ping"] as? JsonObject)?.get("latency")?.jsonPrimitive?.doubleOrNull

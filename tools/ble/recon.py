@@ -1,11 +1,11 @@
-"""Разведка BLE дорожки: только чтение, никаких команд.
+"""BLE treadmill recon: read-only, no commands.
 
     python recon.py scan [--seconds 10]
-    python recon.py gatt <адрес> [--listen 20]
+    python recon.py gatt <address> [--listen 20]
 
-scan   — список BLE-устройств; кандидаты в дорожки помечены «*».
-gatt   — подключение, все сервисы и характеристики, чтение readable-значений,
-         подписка на notify/indicate на --listen секунд (сырые пакеты в hex).
+scan   — list of BLE devices; treadmill candidates are marked "*".
+gatt   — connect, list all services and characteristics, read readable values,
+         subscribe to notify/indicate for --listen seconds (raw packets in hex).
 """
 
 import argparse
@@ -37,12 +37,12 @@ async def scan(seconds: float) -> None:
         mark = "*" if is_candidate(name, adv.service_uuids) else " "
         uuids = ",".join(short(u) for u in adv.service_uuids)
         print(f"{mark} {dev.address}  {adv.rssi:>4} dBm  {name:<24} {uuids}")
-    print(f"\nустройств: {len(rows)}; «*» — похоже на дорожку (имя или сервис FFF0/1826)")
+    print(f"\ndevices: {len(rows)}; \"*\" — looks like a treadmill (name or FFF0/1826 service)")
 
 
 async def gatt(address: str, listen: float) -> None:
     async with BleakClient(address, timeout=20) as client:
-        print(f"подключено: {address}\n")
+        print(f"connected: {address}\n")
         notifiable = []
         for svc in client.services:
             print(f"[service] {short(svc.uuid)}  {svc.description}")
@@ -54,7 +54,7 @@ async def gatt(address: str, listen: float) -> None:
                         val = await client.read_gatt_char(ch)
                         text = val.decode("utf-8", "replace") if val and all(32 <= b < 127 for b in val) else ""
                         line += f"\n          = {val.hex(' ')}" + (f'  "{text}"' if text else "")
-                    except Exception as e:  # noqa: BLE001 — разведка, выводим как есть
+                    except Exception as e:  # noqa: BLE001 — recon tool, just print it as-is
                         line += f"\n          ! read: {e}"
                 print(line)
                 if {"notify", "indicate"} & set(ch.properties):
@@ -69,7 +69,7 @@ async def gatt(address: str, listen: float) -> None:
                 print(f"{ts}  {short(ch.uuid)}  {data.hex(' ')}")
             return cb
 
-        print(f"\nслушаю notify {len(notifiable)} характеристик {listen:.0f} с…")
+        print(f"\nlistening for notify on {len(notifiable)} characteristics for {listen:.0f} s…")
         for ch in notifiable:
             try:
                 await client.start_notify(ch, handler(ch))

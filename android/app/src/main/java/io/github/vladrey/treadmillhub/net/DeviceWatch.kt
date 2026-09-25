@@ -26,15 +26,15 @@ data class NetDevice(
     val ip: String,
     val name: String? = null,
     val hostname: String? = null,
-    /** Производитель и подключение — от роутера ASUS, если он подключён. */
+    /** Vendor and connection info — from the ASUS router, if it's connected. */
     val vendor: String? = null,
     val link: String? = null,
     val firstSeenMs: Long,
     val lastSeenMs: Long,
-    /** Своё устройство: подтверждено владельцем или замечено в первые сутки наблюдения. */
+    /** Own device: confirmed by the owner or seen during the first day of observation. */
     val known: Boolean,
 ) {
-    /** Случайный (локально назначенный) MAC — так делают телефоны и планшеты. */
+    /** Random (locally administered) MAC — what phones and tablets do. */
     val randomMac: Boolean get() = mac.substring(0, 2).toIntOrNull(16)?.and(0x02) == 0x02
 }
 
@@ -45,8 +45,8 @@ private data class DeviceFile(val learnUntilMs: Long = 0, val devices: List<NetD
 data class DevicePatch(val name: String? = null, val known: Boolean? = null)
 
 /**
- * Устройства в сети по MAC. Первые [learnMs] после первого запуска — обучение: всё, что видно, считается
- * своим. Потом новый MAC — незнакомое устройство (сообщение владельцу).
+ * Devices on the network by MAC. The first [learnMs] after the initial run is a learning period: everything
+ * seen is treated as known. After that, a new MAC is an unknown device (a message is sent to the owner).
  */
 class DeviceRegistry(private val file: File, private val learnMs: Long = 24 * 3600_000L) {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
@@ -56,7 +56,7 @@ class DeviceRegistry(private val file: File, private val learnMs: Long = 24 * 36
     @Synchronized fun learning(now: Long) = data.learnUntilMs == 0L || now < data.learnUntilMs
     @Synchronized fun learnUntilMs() = data.learnUntilMs
 
-    /** Отметить увиденные (ip, mac); вернуть впервые увиденные незнакомые устройства. */
+    /** Mark seen (ip, mac) pairs; return unknown devices seen for the first time. */
     @Synchronized
     fun seen(list: List<Pair<String, String>>, now: Long): List<NetDevice> {
         if (data.learnUntilMs == 0L) data = data.copy(learnUntilMs = now + learnMs)
@@ -85,7 +85,7 @@ class DeviceRegistry(private val file: File, private val learnMs: Long = 24 * 36
         save()
     }
 
-    /** Сведения от роутера: имя клиента, производитель, подключение. */
+    /** Info from the router: client name, vendor, connection. */
     @Synchronized
     fun setInfo(info: Map<String, RouterClient>) {
         data = data.copy(devices = data.devices.map { d ->
@@ -95,7 +95,7 @@ class DeviceRegistry(private val file: File, private val learnMs: Long = 24 * 36
         save()
     }
 
-    /** Устройства без имени, чей MAC на 2 меньше Bluetooth-адреса станции, — Wi-Fi этой станции. */
+    /** Unnamed devices whose MAC is 2 less than a station's Bluetooth address — that station's Wi-Fi. */
     @Synchronized
     fun nameStations(ble: Map<String, String>) {
         if (ble.isEmpty()) return
@@ -138,7 +138,7 @@ class DeviceRegistry(private val file: File, private val learnMs: Long = 24 * 36
             return String.format("%012x", v - 2).chunked(2).joinToString(":")
         }
 
-        /** Разбор /proc/net/arp: только полные записи (флаг 0x2) на [iface]. */
+        /** Parsing /proc/net/arp: only complete entries (flag 0x2) on [iface]. */
         fun parseArp(text: String, iface: String = "wlan0"): List<Pair<String, String>> = text.lines().drop(1).mapNotNull { line ->
             val f = line.trim().split(Regex("\\s+"))
             if (f.size < 6 || f[5] != iface) return@mapNotNull null
@@ -149,12 +149,12 @@ class DeviceRegistry(private val file: File, private val learnMs: Long = 24 * 36
 }
 
 /**
- * Раз в [intervalMs]: клиенты от роутера ASUS (если подключён) плюс опрос подсети /24 — UDP-пакет на каждый
- * адрес заполняет ARP-таблицу, её и читаем.
+ * Every [intervalMs]: clients from the ASUS router (if connected) plus a /24 subnet sweep — a UDP packet to
+ * each address populates the ARP table, which we then read.
  */
 class DeviceWatch(
     private val context: Context, dir: File, private val telegram: Telegram, private val router: RouterWatch,
-    /** Bluetooth-адрес станции → её имя: Wi-Fi-модуль станции (ESP32) узнаём по MAC = Bluetooth − 2. */
+    /** Station Bluetooth address → its name: we identify a station's Wi-Fi module (ESP32) by MAC = Bluetooth − 2. */
     private val stations: () -> Map<String, String> = { emptyMap() },
     private val intervalMs: Long = 5 * 60_000L,
 ) {
@@ -164,7 +164,7 @@ class DeviceWatch(
 
     fun start(scope: CoroutineScope) {
         scope.launch(Dispatchers.IO) {
-            delay(30_000) // после загрузки — дать Wi-Fi подняться
+            delay(30_000) // after boot — give Wi-Fi time to come up
             while (isActive) {
                 runCatching { scan(scope) }
                 delay(intervalMs)
@@ -193,7 +193,7 @@ class DeviceWatch(
         if (fromRouter.isNotEmpty()) registry.setInfo(fromRouter.associateBy { it.mac })
         registry.nameStations(stations())
         lastScanMs = now
-        // Имена от роутера (DHCP) — для новых и ещё безымянных устройств
+        // Names from the router (DHCP) — for new and still-unnamed devices
         registry.all().filter { it.hostname == null && it.lastSeenMs == now }.take(8).forEach { d ->
             runCatching { InetAddress.getByName(d.ip).canonicalHostName }.getOrNull()
                 ?.takeIf { it != d.ip }?.let { registry.setHostname(d.mac, it.removeSuffix(".lan").removeSuffix(".local")) }
@@ -207,7 +207,7 @@ class DeviceWatch(
         }
     }
 
-    /** /proc/net/arp; если приложению не дают читать — через root. */
+    /** /proc/net/arp; if the app isn't allowed to read it — via root. */
     private fun readArp(): String {
         val direct = runCatching { File("/proc/net/arp").readText() }.getOrDefault("")
         if (direct.lines().size > 1) return direct

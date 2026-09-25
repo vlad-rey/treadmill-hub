@@ -30,7 +30,7 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.TemporalAdjusters
 
-/** Чат, которому владелец открыл доступ к боту; [profileId] — профиль дорожки (сводки и напоминания). */
+/** Chat the owner has granted access to the bot; [profileId] — treadmill profile (summaries and reminders). */
 @Serializable
 data class BotChat(
     val chatId: String,
@@ -44,13 +44,13 @@ data class BotChat(
 @Serializable
 private data class BotFile(
     val chats: List<BotChat> = emptyList(),
-    /** Расписание: задача → последний выполненный период (дата недели или дня). */
+    /** Schedule: task → last completed period (week or day date). */
     val done: Map<String, String> = emptyMap(),
 )
 
 /**
- * Telegram-бот хаба: команды (/status, /progress, /week, /charge …), доступ по разрешению владельца,
- * недельные отчёты (пн 09:00) и напоминания о наградах (19:00). Владелец — чат из настроек хаба.
+ * Hub's Telegram bot: commands (/status, /progress, /week, /charge …), access by owner approval,
+ * weekly reports (Mon 09:00) and reward reminders (19:00). The owner is the chat from the hub settings.
  */
 class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.systemDefault()) {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
@@ -64,12 +64,12 @@ class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.sys
     fun start(scope: CoroutineScope) {
         this.scope = scope
         scope.launch(Dispatchers.IO) { poll() }
-        scope.launch { while (isActive) { runCatching { schedule() }.onFailure { Log.w("Bot", "расписание: ${it.message}") }; delay(60_000) } }
+        scope.launch { while (isActive) { runCatching { schedule() }.onFailure { Log.w("Bot", "schedule: ${it.message}") }; delay(60_000) } }
     }
 
     @Synchronized fun chats(): List<BotChat> = data.chats
 
-    // --- Приём команд (long polling) ---------------------------------------------------------
+    // --- Receiving commands (long polling) ---------------------------------------------------
     private suspend fun poll() {
         var menuSet = false
         while (true) {
@@ -82,7 +82,7 @@ class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.sys
                 val o = u.jsonObject
                 offset = maxOf(offset, (o["update_id"]?.jsonPrimitive?.long ?: continue) + 1)
                 val m = o["message"]?.jsonObject ?: continue
-                // Команды, пришедшие, пока хаб был выключен, старше 10 мин — не выполняем
+                // Commands received while the hub was off, older than 10 min — don't execute
                 val date = m["date"]?.jsonPrimitive?.longOrNull ?: 0
                 if (System.currentTimeMillis() / 1000 - date > 600) continue
                 val chat = m["chat"]?.jsonObject ?: continue
@@ -95,7 +95,7 @@ class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.sys
                         username = from.str("username"),
                         text = text.trim(),
                     )
-                }.onFailure { Log.w("Bot", "команда «$text»: ${it.message}") }
+                }.onFailure { Log.w("Bot", "command \"$text\": ${it.message}") }
             }
         }
     }
@@ -146,7 +146,7 @@ class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.sys
     private fun requestAccess(chatId: String, name: String, username: String?) {
         val now = System.currentTimeMillis()
         val prev = chat(chatId)
-        if (prev != null && now - prev.requestedAtMs < 3600_000) return // не засыпаем владельца запросами
+        if (prev != null && now - prev.requestedAtMs < 3600_000) return // don't flood the owner with requests
         update(BotChat(chatId, name, username, prev?.profileId, allowed = false, requestedAtMs = now))
         reply(chatId, "Привет! Это бот домашнего хаба. Запрос на доступ отправлен владельцу — после его подтверждения здесь появятся команды.")
         val profiles = hub.profiles.all().joinToString(", ") { it.name }
@@ -180,7 +180,7 @@ class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.sys
         reply(chatId, "Этот чат привязан к профилю «${p.name}»: сводки по дорожке и напоминания о наградах будут приходить сюда.")
     }
 
-    /** Профиль по имени: точное совпадение или единственный, чьё имя начинается так («Диана» → «Диана <3»). */
+    /** Profile by name: exact match, or the single one whose name starts with it ("Diana" → "Diana <3"). */
     private fun findProfile(name: String) = name.trim().takeIf { it.isNotEmpty() }?.let { n ->
         hub.profiles.all().firstOrNull { it.name.equals(n, ignoreCase = true) }
             ?: hub.profiles.all().filter { it.name.startsWith(n, ignoreCase = true) }.singleOrNull()
@@ -216,7 +216,7 @@ class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.sys
         reply(chatId, lines.joinToString("\n"))
     }
 
-    // --- Ответы ------------------------------------------------------------------------------
+    // --- Replies -----------------------------------------------------------------------------
     private fun status(): String {
         val snap = hub.snapshot.value
         val t = snap.treadmill
@@ -258,7 +258,7 @@ class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.sys
         else pid?.let { reports.treadmillWeek(from, today, profileWeek(it, from, today)) } ?: "Этот чат не привязан к профилю дорожки."
     }
 
-    // --- Данные для отчётов --------------------------------------------------------------------
+    // --- Data for reports ------------------------------------------------------------------------
     private fun ms(d: LocalDate) = d.atStartOfDay(zone).toInstant().toEpochMilli()
 
     fun profileWeek(pid: String, from: LocalDate, to: LocalDate): ProfileWeek {
@@ -290,16 +290,16 @@ class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.sys
         )
     }
 
-    // --- Расписание ----------------------------------------------------------------------------
+    // --- Schedule ------------------------------------------------------------------------------
     private fun schedule() {
         if (telegram.ownerChatId == null) return
         val now = ZonedDateTime.now(zone)
         val today = now.toLocalDate()
 
-        // Отчёт за прошлую неделю: с понедельника 09:00 (если хаб был выключен — позже на этой неделе)
+        // Last week's report: from Monday 09:00 (if the hub was off — later this week)
         val monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
         val weekKey = monday.minusDays(7).toString()
-        // Первый запуск: за прошлые недели данных нет — первый отчёт будет в следующий понедельник
+        // First run: no data for past weeks — the first report will be next Monday
         if (done("weekly") == null) markDone("weekly", weekKey)
         if (done("weekly") != weekKey && (today > monday || now.toLocalTime() >= LocalTime.of(9, 0))) {
             val from = monday.minusDays(7); val to = monday.minusDays(1)
@@ -308,11 +308,11 @@ class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.sys
             chats().filter { it.allowed && it.profileId != null }.forEach { c ->
                 telegram.sendTo(scope, c.chatId, reports.treadmillWeek(from, to, profileWeek(c.profileId!!, from, to)))
             }
-            if (ownerProfile == null) Log.i("Bot", "владелец не привязан к профилю — личная сводка не отправлена")
+            if (ownerProfile == null) Log.i("Bot", "owner not linked to a profile — personal summary not sent")
             markDone("weekly", weekKey)
         }
 
-        // Напоминания о наградах: 19:00–22:00, раз в день
+        // Reward reminders: 19:00-22:00, once a day
         val t = now.toLocalTime()
         if (done("remind") != today.toString() && t >= LocalTime.of(19, 0) && t < LocalTime.of(22, 0)) {
             chats().filter { it.allowed && it.profileId != null }.forEach { c ->
@@ -323,7 +323,7 @@ class Bot(private val hub: Hub, dir: File, private val zone: ZoneId = ZoneId.sys
         }
     }
 
-    // --- Хранилище -----------------------------------------------------------------------------
+    // --- Storage -------------------------------------------------------------------------------
     @Synchronized private fun done(key: String) = data.done[key]
     @Synchronized private fun markDone(key: String, value: String) { data = data.copy(done = data.done + (key to value)); save() }
 

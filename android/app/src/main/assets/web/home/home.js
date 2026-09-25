@@ -1,5 +1,5 @@
 "use strict";
-// Главная: плитки с живым состоянием дорожки, станций, сети и хаба. Обновление каждые 5 с.
+// Home: tiles with live status of the treadmill, power stations, network and hub. Refreshes every 5 s.
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -24,7 +24,7 @@ function since(ms) {
 function renderState(snap) {
   const t = snap.treadmill, s = snap.session, h = snap.hub, net = h.net || {};
 
-  // Дорожка
+  // Treadmill
   const connected = t.connection === "CONNECTED";
   if (s.active) {
     pill("trState", "идёт тренировка", "ok");
@@ -37,7 +37,7 @@ function renderState(snap) {
   }
   $("tTreadmill").classList.toggle("live", !!s.active);
 
-  // Сеть
+  // Network
   const netBad = !!net.outage || net.routerOk === false || net.internetOk === false;
   pill("netState", net.routerOk == null ? "…" : netBad ? (net.routerOk === false ? "нет роутера" : "нет интернета") : "всё работает", netBad ? "bad" : "ok");
   $("netBody").innerHTML = row("Роутер", net.routerOk == null ? "—" : net.routerOk ? `${net.routerMs ?? "?"} мс` : "не отвечает") +
@@ -45,7 +45,7 @@ function renderState(snap) {
     (net.outage ? row("Сбой идёт", since(net.outage.startMs)) : "");
   $("tNet").classList.toggle("bad", netBad);
 
-  // Хаб
+  // Hub
   const hot = h.batteryTempC != null && h.batteryTempC >= 45;
   const hubBad = h.plugged === false || hot;
   pill("hubState", h.plugged === false ? "без зарядки" : hot ? "перегрев" : "работает", hubBad ? "bad" : "ok");

@@ -1,150 +1,150 @@
-# BLE-протокол FitLogic T12B (модуль FitShow)
+# FitLogic T12B BLE protocol (FitShow module)
 
-Статус: **этап 0–1**: структура GATT, телеметрия и управление через FTMS подтверждены. Всё ниже получено 2026-09-25 чтением GATT и пассивным прослушиванием уведомлений с PC (`tools/ble/recon.py`), без команд записи. Дорожка в режиме ожидания.
+Status: **stage 0–1**: GATT structure, telemetry, and FTMS control are confirmed. Everything below was obtained on 2026-09-25 by reading the GATT table and passively listening to notifications from the PC (`tools/ble/recon.py`), with no write commands. The treadmill was idle.
 
-## Устройство
+## Device
 
-| Поле | Значение |
+| Field | Value |
 |---|---|
-| Имя BLE | `Run BT` |
-| Производитель (2A29) | `FITSHOW` |
-| Модель модуля (2A24) | `FS-BT-D2` |
-| Прошивка (2A26) | `V2.6.3` |
+| BLE name | `Run BT` |
+| Manufacturer (2A29) | `FITSHOW` |
+| Module model (2A24) | `FS-BT-D2` |
+| Firmware (2A26) | `V2.6.3` |
 | Hardware / Software (2A27 / 2A28) | `1.0` / `1.4.2` |
-| MAC, серийный номер | в `protocol/raw/` (не в git) |
+| MAC, serial number | in `protocol/raw/` (not in git) |
 
-Реклама: сервисы `FFF0` и `1826`.
+Advertising: services `FFF0` and `1826`.
 
-## Сервисы
+## Services
 
-| Сервис | Назначение | Характеристики |
+| Service | Purpose | Characteristics |
 |---|---|---|
-| `1800` | Generic Access | `2A00` имя |
-| `180A` | Device Information | см. выше. Модуль заполняет часть полей мусором (`2A51`, `2A5D` = MAC, `2A46` = `FS-Update_1.0`) |
-| **`1826`** | **FTMS — Fitness Machine (стандарт Bluetooth SIG)** | см. ниже |
-| `FFF0` | Проприетарный протокол FitShow | `FFF1` notify, `FFF2` write-without-response |
-| `FFE0` | Вероятно, UART модуля / обновление прошивки | `FFE4` notify, `FFE1` write-without-response. **Не трогать** |
-| `180D` | Heart Rate | `2A37` notify, `B001`/`B002` notify (вендорские) |
+| `1800` | Generic Access | `2A00` name |
+| `180A` | Device Information | see above. The module fills some fields with garbage (`2A51`, `2A5D` = MAC, `2A46` = `FS-Update_1.0`) |
+| **`1826`** | **FTMS — Fitness Machine (Bluetooth SIG standard)** | see below |
+| `FFF0` | FitShow's proprietary protocol | `FFF1` notify, `FFF2` write-without-response |
+| `FFE0` | Likely the module's UART / firmware update | `FFE4` notify, `FFE1` write-without-response. **Do not touch** |
+| `180D` | Heart Rate | `2A37` notify, `B001`/`B002` notify (vendor-specific) |
 
-## FTMS (`1826`) — основной кандидат для хаба
+## FTMS (`1826`) — main candidate for the hub
 
 ### Fitness Machine Feature (`2ACC`) = `dc 56 00 00 0f 00 00 00`
 
 Machine features `0x000056DC`: total distance, inclination, elevation gain, step count, resistance level, expended energy, heart rate, elapsed time, power.
 
-Target setting features `0x0000000F`: **задание скорости**, **задание наклона**, сопротивления, мощности → управление через Control Point (`2AD9`) поддерживается.
+Target setting features `0x0000000F`: **speed target**, **incline target**, resistance, power → control via the Control Point (`2AD9`) is supported.
 
-### Диапазоны
+### Ranges
 
-| Характеристика | Сырые данные | Значение |
+| Characteristic | Raw data | Value |
 |---|---|---|
-| Speed Range `2AD4` | `64 00 40 06 0a 00` | 1,00–16,00 км/ч, шаг 0,1 (единица 0,01 км/ч) |
-| Inclination Range `2AD5` | `00 00 96 00 0a 00` | 0,0–15,0 %, шаг 1,0 % (единица 0,1 %) |
-| Resistance Range `2AD6` | `00 00 ff 00 01 00` | 0–255 (для дорожки не используется) |
-| Power Range `2AD8` | `0a 00 0f 27 0a 00` | 10–9999 Вт |
-| Heart Rate Range `2AD7` | `00 00 fa 00 01 00` | 0–250 уд/мин |
+| Speed Range `2AD4` | `64 00 40 06 0a 00` | 1.00–16.00 km/h, step 0.1 (unit 0.01 km/h) |
+| Inclination Range `2AD5` | `00 00 96 00 0a 00` | 0.0–15.0%, step 1.0% (unit 0.1%) |
+| Resistance Range `2AD6` | `00 00 ff 00 01 00` | 0–255 (unused for a treadmill) |
+| Power Range `2AD8` | `0a 00 0f 27 0a 00` | 10–9999 W |
+| Heart Rate Range `2AD7` | `00 00 fa 00 01 00` | 0–250 bpm |
 | Training Status `2AD3` | `01 01` | Idle |
 
-Совпадает с паспортом T12B: 1–16 км/ч, 0–15 %.
+Matches the T12B spec sheet: 1–16 km/h, 0–15%.
 
-### Treadmill Data (`2ACD`), ~1 Гц, два пакета
+### Treadmill Data (`2ACD`), ~1 Hz, two packets
 
-**Пакет 1**: `8c 05 | 00 00 | 00 00 00 | 00 00 | 00 00 | 00 00 | ff ff | ff | 00 | 00 00`
+**Packet 1**: `8c 05 | 00 00 | 00 00 00 | 00 00 | 00 00 | 00 00 | ff ff | ff | 00 | 00 00`
 
-Флаги `0x058C` (бит 0 = 0 → мгновенная скорость присутствует):
+Flags `0x058C` (bit 0 = 0 → instantaneous speed is present):
 
-| Байты | Поле | Тип | Ед. | Сейчас |
+| Bytes | Field | Type | Unit | Current value |
 |---|---|---|---|---|
 | 0–1 | flags | uint16 | — | `0x058C` |
-| 2–3 | Instantaneous Speed | uint16 | 0,01 км/ч | 0 |
-| 4–6 | Total Distance | uint24 | м | 0 |
-| 7–8 | Inclination | sint16 | 0,1 % | 0 |
-| 9–10 | Ramp Angle | sint16 | 0,1° | 0 |
-| 11–12 | Total Energy | uint16 | ккал | 0 |
-| 13–14 | Energy per Hour | uint16 | ккал | `ffff` = нет данных |
-| 15 | Energy per Minute | uint8 | ккал | `ff` = нет данных |
-| 16 | Heart Rate | uint8 | уд/мин | 0 |
-| 17–18 | Elapsed Time | uint16 | с | 0 |
+| 2–3 | Instantaneous Speed | uint16 | 0.01 km/h | 0 |
+| 4–6 | Total Distance | uint24 | m | 0 |
+| 7–8 | Inclination | sint16 | 0.1% | 0 |
+| 9–10 | Ramp Angle | sint16 | 0.1° | 0 |
+| 11–12 | Total Energy | uint16 | kcal | 0 |
+| 13–14 | Energy per Hour | uint16 | kcal | `ffff` = no data |
+| 15 | Energy per Minute | uint8 | kcal | `ff` = no data |
+| 16 | Heart Rate | uint8 | bpm | 0 |
+| 17–18 | Elapsed Time | uint16 | s | 0 |
 
-**Пакет 2**: `01 20 | 00 00 00` — флаги `0x2001` (бит 0 = More Data, бит 13 не определён в FTMS). Вероятно, вендорское поле — счётчик шагов (uint24). **Проверить при движении.**
+**Packet 2**: `01 20 | 00 00 00` — flags `0x2001` (bit 0 = More Data, bit 13 undefined in FTMS). Likely a vendor field — a step counter (uint24). **Verify while moving.**
 
 ## FitShow (`FFF0`)
 
-Без опроса модуль сам шлёт в `FFF1`:
+Without polling, the module sends on its own via `FFF1`:
 
-| Кадр | Период | Предположение |
+| Frame | Period | Guess |
 |---|---|---|
-| `02 51 00 51 03` | ~1 с | статус, `00` = ожидание |
-| `02 44 cb 8f 03` | ~4 с | ? |
+| `02 51 00 51 03` | ~1 s | status, `00` = idle |
+| `02 44 cb 8f 03` | ~4 s | ? |
 
-Формат кадра: `02` · команда · данные… · XOR(команда, данные…) · `03`. Проверено: `51 ^ 00 = 51`, `44 ^ cb = 8f`.
+Frame format: `02` · command · data… · XOR(command, data…) · `03`. Verified: `51 ^ 00 = 51`, `44 ^ cb = 8f`.
 
-Нужен для того, чего нет в FTMS: запуск встроенных программ P1–P12 (если поддерживается), возможно — вендорские данные. Команды — из записи обмена приложения FitShow (HCI snoop).
+Needed for things FTMS doesn't cover: launching built-in programs P1–P12 (if supported), possibly vendor-specific data. Commands come from a capture of the FitShow app's exchange (HCI snoop).
 
-## Управление через FTMS — проверено 2026-09-25
+## Control via FTMS — verified 2026-09-25
 
-Тест `tools/ble/ftms_test.py` (человек у дорожки, лимиты 3 км/ч и 3 %). Все команды приняты с результатом `01` (успех):
+Test `tools/ble/ftms_test.py` (a person at the treadmill, limits of 3 km/h and 3%). All commands were accepted with result `01` (success):
 
-| Команда | Запись в `2AD9` | Ответ (indicate) | Поведение |
+| Command | Write to `2AD9` | Response (indicate) | Behavior |
 |---|---|---|---|
 | Request Control | `00` | `80 00 01` | — |
-| Start | `07` | `80 07 01` | отсчёт 3-2-1 (~3 с), затем лента 1,0 км/ч |
-| Set Target Speed 2,0 км/ч | `02 c8 00` | `80 02 01` | телеметрия показывает новую скорость в следующем пакете |
-| Set Target Speed 3,0 км/ч | `02 2c 01` | `80 02 01` | |
-| Set Target Inclination 2 % | `03 14 00` | `80 03 01` | телеметрия сразу показывает целевой наклон (не фактическое положение деки) |
-| Set Target Inclination 0 % | `03 00 00` | `80 03 01` | |
-| Stop | `08 01` | `80 08 01` | плавное торможение 3,0 → 0 за ~4 с |
+| Start | `07` | `80 07 01` | 3-2-1 countdown (~3 s), then the belt moves at 1.0 km/h |
+| Set Target Speed 2.0 km/h | `02 c8 00` | `80 02 01` | telemetry shows the new speed in the next packet |
+| Set Target Speed 3.0 km/h | `02 2c 01` | `80 02 01` | |
+| Set Target Inclination 2% | `03 14 00` | `80 03 01` | telemetry shows the target incline immediately (not the deck's actual position) |
+| Set Target Inclination 0% | `03 00 00` | `80 03 01` | |
+| Stop | `08 01` | `80 08 01` | smooth deceleration 3.0 → 0 over ~4 s |
 
-Индикация на `2AD9` должна быть включена **до** первой записи.
+Indications on `2AD9` must be enabled **before** the first write.
 
-### Статусы
+### Statuses
 
-- Fitness Machine Status `2ADA`: `04` — «запущено» (после Start и в начале движения).
-- Training Status `2AD3`: `01 0e` — pre-workout (отсчёт), `01 0d` — manual mode (движение), `01 0f` — post-workout (после Stop), `01 01` — idle.
+- Fitness Machine Status `2ADA`: `04` — "started" (after Start and at the beginning of movement).
+- Training Status `2AD3`: `01 0e` — pre-workout (countdown), `01 0d` — manual mode (moving), `01 0f` — post-workout (after Stop), `01 01` — idle.
 
-### Замечания
+### Notes
 
-- **Total Distance в FTMS остался 0 м** за ~40 с движения (~25 м). Либо поле обновляется крупными шагами, либо не заполняется — проверить на длинной дистанции и сверить с пультом.
-- Второй пакет Treadmill Data (флаги `0x2001`, вендорский бит 13): 3-байтовое значение растёт во время движения (0 → 10 за тест) и совпадает с полем «B» кадра FitShow `0x51` (см. ниже). Смысл пока неизвестен.
+- **Total Distance in FTMS stayed at 0 m** over ~40 s of movement (~25 m). Either the field updates in large steps or isn't populated at all — check over a longer distance and cross-check against the console.
+- The second Treadmill Data packet (flags `0x2001`, vendor bit 13): a 3-byte value grows during movement (0 → 10 over the test) and matches field "B" in the FitShow `0x51` frame (see below). Meaning still unknown.
 
-## FitShow `0x51` — статус (из того же теста)
+## FitShow `0x51` — status (from the same test)
 
-`02 51 <состояние> [данные] <xor> 03`
+`02 51 <state> [data] <xor> 03`
 
-| Состояние | Данные | Когда |
+| State | Data | When |
 |---|---|---|
-| `00` | — | ожидание |
-| `02` | `NN` — секунды отсчёта (`03`, `02`, `01`) | отсчёт перед стартом |
-| `03` | 12 байт, см. ниже | движение |
-| `04` | 12 байт | торможение / после Stop |
-| `0a` | 12 байт | **пауза** (FTMS `08 02`): время, дистанция, калории замирают, наклон сохраняется; Start (`07`) → отсчёт 3-2-1 → 1,0 км/ч |
+| `00` | — | idle |
+| `02` | `NN` — countdown seconds (`03`, `02`, `01`) | countdown before start |
+| `03` | 12 bytes, see below | moving |
+| `04` | 12 bytes | decelerating / after Stop |
+| `0a` | 12 bytes | **paused** (FTMS `08 02`): time, distance, and calories freeze, incline is kept; Start (`07`) → 3-2-1 countdown → 1.0 km/h |
 
-Данные в состоянии `03`/`04`, например `1e 00 22 00 00 00 11 00 07 00 00 00`:
+Data in state `03`/`04`, e.g. `1e 00 22 00 00 00 11 00 07 00 00 00`:
 
-| Смещение | Пример | Предположение |
+| Offset | Example | Guess |
 |---|---|---|
-| 0 | `1e` | скорость, 0,1 км/ч (3,0) |
-| 1 | `00` | наклон, % |
-| 2–3 | `22 00` | время, с (34) — совпадает с FTMS Elapsed Time |
-| 4–5 | `00 00` | **дистанция, м** (шаг 10 м) — сверено с пультом: 750 м → «0.7» |
-| 6–7 | `11 00` | **ккал × 10** — сверено с пультом: 157 → «15» |
-| 8–9 | `07 00` | «B» — то же, что вендорское поле FTMS; растёт и после Stop |
+| 0 | `1e` | speed, 0.1 km/h (3.0) |
+| 1 | `00` | incline, % |
+| 2–3 | `22 00` | time, s (34) — matches FTMS Elapsed Time |
+| 4–5 | `00 00` | **distance, m** (step 10 m) — cross-checked against the console: 750 m → "0.7" |
+| 6–7 | `11 00` | **kcal × 10** — cross-checked against the console: 157 → "15" |
+| 8–9 | `07 00` | "B" — same as the vendor field in FTMS; keeps growing after Stop |
 | 10–11 | `00 00` | ? |
 
-Ответ модуля на команды FTMS в `FFF1`: `02 53 01 03 00 51 03` (старт), `02 53 02 <скорость> <наклон> <xor> 03` (новые цели), `02 53 03 50 03` (стоп) — модуль транслирует FTMS в свои команды `0x53`.
-## Открытые вопросы
+The module's response to FTMS commands on `FFF1`: `02 53 01 03 00 51 03` (start), `02 53 02 <speed> <incline> <xor> 03` (new targets), `02 53 03 50 03` (stop) — the module translates FTMS into its own `0x53` commands.
+## Open questions
 
-- [x] Управление через FTMS Control Point работает: Request Control, Start, скорость, наклон, Stop.
-- [ ] Дистанция: FTMS отдаёт 0 — сверить с пультом на длинной дистанции; смысл полей «B» и ккал × 10.
-- [ ] Что шлёт `180D` / `B001` / `B002` при касании пульсовых датчиков.
-- [ ] Протокол FitShow: запись обмена приложения FitShow, запуск встроенных программ.
-- [x] **Пропажа BLE во время движения — дорожка сразу останавливает ленту сама**, без ошибки, и возвращается в ожидание (FitShow `0x51` = `00`). Проверено 2026-09-25: 2 км/ч, аварийное завершение хаба (`am force-stop`), владелец у дорожки.
+- [x] Control via the FTMS Control Point works: Request Control, Start, speed, incline, Stop.
+- [ ] Distance: FTMS reports 0 — cross-check against the console over a longer distance; meaning of the "B" field and kcal × 10.
+- [ ] What `180D` / `B001` / `B002` send when the heart-rate sensors are touched.
+- [ ] FitShow protocol: capture of the FitShow app's exchange, launching built-in programs.
+- [x] **If BLE drops during movement, the treadmill immediately stops the belt itself**, without an error, and returns to idle (FitShow `0x51` = `00`). Verified 2026-09-25: 2 km/h, hub force-killed (`am force-stop`), owner at the treadmill.
 
-## Сверка с пультом — тест 2026-09-25 (5 км/ч, 0 % и 10 %, пауза, СТОП)
+## Cross-check against the console — test 2026-09-25 (5 km/h, 0% and 10%, pause, STOP)
 
-- Время, дистанция, калории FitShow совпадают с пультом. FTMS Total Distance — всегда 0.
-- Дистанция хаба по скорости завышает ~5 % (разгоны: телеметрия сразу показывает целевую скорость) → хаб берёт счётчик дорожки.
-- Калории дорожки: 5,8 ккал/мин при 0 % и 6,4 при 10 % (+11 %); ACSM для 90 кг: 5,3 и 12,1 (+127 %) — дорожка почти не учитывает наклон.
-- Уровень наклона на пульте = % по FTMS (10 → «10»).
-- STOP с пульта = пауза (наклон опускается); FTMS Stop (`08 01`) = полный сброс пульта; FTMS Pause (`08 02`) = пауза с сохранением наклона.
-- Fitness Machine Status на паузе: `02 02`.
+- Time, distance, and calories from FitShow match the console. FTMS Total Distance is always 0.
+- The hub's speed-based distance overshoots by ~5% (accelerations: telemetry immediately shows the target speed) → the hub uses the treadmill's own counter instead.
+- Treadmill calories: 5.8 kcal/min at 0% and 6.4 at 10% (+11%); ACSM for 90 kg: 5.3 and 12.1 (+127%) — the treadmill barely accounts for incline.
+- Incline level on the console = % by FTMS (10 → "10").
+- STOP from the console = pause (incline lowers); FTMS Stop (`08 01`) = full console reset; FTMS Pause (`08 02`) = pause with incline kept.
+- Fitness Machine Status while paused: `02 02`.

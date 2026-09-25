@@ -1,10 +1,10 @@
 {
- "source": "Инструкция FitLogic T12B (укр.), стр. 19–22: «Таблиця попередньо встановлених програм»",
+ "source": "FitLogic T12B manual (Ukrainian), pp. 19-22: «Таблиця попередньо встановлених програм» (Preset program table)",
  "notes": [
-  "18 отрезков; время программы (по умолчанию 30 мин, 5–99) делится на 18 равных отрезков",
-  "speed — км/ч; incline — уровень наклона пульта 1–15 (по FTMS дорожка отдаёт наклон в % 0–15, соответствие уровня и % проверить)",
-  "incline отсутствует — программа меняет только скорость, наклон остаётся как есть",
-  "Во время отрезка скорость/наклон можно менять вручную, со следующего отрезка программа возвращает свои значения"
+  "18 segments; the program duration (default 30 min, 5-99) is split into 18 equal segments",
+  "speed - km/h; incline - console incline level 1-15 (per FTMS the treadmill reports incline in % 0-15; the mapping between level and % needs verification)",
+  "incline absent - the program only changes speed, incline stays as-is",
+  "Speed/incline can be adjusted manually during a segment; the program reapplies its own values from the next segment onward"
  ],
  "segments": 18,
  "defaultMinutes": 30,

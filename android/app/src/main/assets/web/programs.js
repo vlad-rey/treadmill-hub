@@ -1,11 +1,11 @@
 "use strict";
-// Вкладки «Программы» и «История», панель выполняемой программы, график профиля, редактор.
-// Использует общие функции из app.js: $, me, control, toast, fmtTime.
+// "Programs" and "History" tabs, running-program panel, profile chart, editor.
+// Uses shared functions from app.js: $, me, control, toast, fmtTime.
 
-// --- Вкладки -----------------------------------------------------------------------
+// --- Tabs -----------------------------------------------------------------------
 const TAB_TITLES = { workout: "Тренировка", programs: "Программы", history: "История", awards: "Награды" };
 function showTab(name) {
-  if (name === "hub") { location.replace("/hub/"); return; } // старые ссылки на вкладку «Хаб»
+  if (name === "hub") { location.replace("/hub/"); return; } // legacy links to the "Hub" tab
   if (!TAB_TITLES[name]) name = "workout";
   document.title = `${TAB_TITLES[name]} · Дорожка`;
   history.replaceState(null, "", name === "workout" ? location.pathname : "#" + name);
@@ -21,7 +21,7 @@ window.addEventListener("hashchange", () => showTab(location.hash.slice(1)));
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-// --- График профиля: столбцы — скорость (ширина ∝ длительности), линия — наклон ----------
+// --- Profile chart: bars — speed (width ∝ duration), line — incline ----------
 function drawChart(svg, segments, elapsedS) {
   if (!segments || !segments.length) { svg.innerHTML = ""; return; }
   const W = 1000, H = 120;
@@ -53,7 +53,7 @@ function summarize(segments) {
   return `${fmtTime(total)} · до ${vmax} км/ч` + (incs.length ? ` · наклон до ${Math.max(...incs)} %` : " · наклон не меняется") + ` · ≈ ${km.toFixed(1)} км`;
 }
 
-// --- Панель выполняемой программы на вкладке «Тренировка» ------------------------------
+// --- Running-program panel on the "Workout" tab ------------------------------
 window.renderProgram = function (p) {
   const panel = $("programPanel");
   if (!p) { panel.classList.add("hidden"); return; }
@@ -71,7 +71,7 @@ window.renderProgram = function (p) {
 };
 $("progEnd").onclick = () => control("programEnd");
 
-// --- Список программ ----------------------------------------------------------------
+// --- Program list ----------------------------------------------------------------
 let programList = [];
 async function loadPrograms() {
   programList = await (await fetch("/api/programs?profile=" + encodeURIComponent(me ? me.id : ""))).json();
@@ -87,7 +87,7 @@ document.addEventListener("click", (e) => {
   if (b) openProgram(programList.find((p) => p.id === b.dataset.program));
 });
 
-// --- Диалог запуска программы -----------------------------------------------------------
+// --- Program launch dialog -----------------------------------------------------------
 const pd = { program: null, level: 1, minutes: 30, segments: [] };
 const remembered = (key, def) => { try { return Number(localStorage.getItem(key)) || def; } catch (_) { return def; } };
 const remember = (key, v) => { try { localStorage.setItem(key, v); } catch (_) {} };
@@ -148,7 +148,7 @@ $("pdDelete").onclick = async () => {
   loadPrograms();
 };
 
-// --- Редактор своей программы: блоки шагов с повторами ---------------------------------
+// --- Custom program editor: step blocks with repeats ---------------------------------
 let editing = null; // { id|null, name, blocks: [{repeat, steps:[{durationS, speedKmh, inclinePct}]}] }
 
 function openEditor(program) {
@@ -235,7 +235,7 @@ $("edSave").onclick = async () => {
   loadPrograms();
 };
 
-// --- История -------------------------------------------------------------------------
+// --- History -------------------------------------------------------------------------
 const fmtDate = (ms) => new Date(ms).toLocaleString("ru-RU", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const sessionRow = (s, claim) => `<div class="row" data-session="${s.id}"><span class="grow"><b>${fmtDate(s.id)}</b>
   <small>${fmtTime(s.movingS)} · ${(s.distanceM / 1000).toFixed(2)} км · ${Math.round(s.kcalCalc)} ккал (дорожка ${s.kcalTreadmill == null ? "—" : Math.round(s.kcalTreadmill)})</small></span>
@@ -276,7 +276,7 @@ $("orphanList").addEventListener("click", async (e) => {
 
 const clock = (ms) => new Date(ms).toLocaleString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
-// --- Своя программа на основе встроенной: одинаковые подряд отрезки склеиваются -------------
+// --- Custom program based on a built-in one: consecutive identical segments are merged -------------
 $("pdCopy").onclick = () => {
   const p = pd.program;
   const steps = [];
@@ -289,11 +289,11 @@ $("pdCopy").onclick = () => {
   openEditor({ id: null, name: `${p.id} ${p.name} · ур. ${pd.level} (моя)`, blocks: [{ repeat: 1, steps }] });
 };
 
-// --- Подробности тренировки ---------------------------------------------------------------
+// --- Workout details ---------------------------------------------------------------
 let sdSession = null;
 
 document.addEventListener("click", async (e) => {
-  if (e.target.closest("[data-claim]")) return; // «Это моя» обрабатывается отдельно
+  if (e.target.closest("[data-claim]")) return; // "This is mine" is handled separately
   const row = e.target.closest("[data-session]");
   if (row) openSession(Number(row.dataset.session));
 });
@@ -315,7 +315,7 @@ async function openSession(id) {
     card("Скорость", avgV.toFixed(1) + " км/ч", `средняя · макс ${maxV.toFixed(1)} · наклон до ${Math.round(maxI)} %`),
   ].join("");
 
-  // График: подряд идущие одинаковые сэмплы склеиваются в отрезки
+  // Chart: consecutive identical samples are merged into segments
   const segs = [];
   for (let i = 0; i < samples.length; i++) {
     const cur = samples[i], next = samples[i + 1];
@@ -357,7 +357,7 @@ $("sdDelete").onclick = async () => {
   loadStats();
 };
 
-// --- Вес: история, график, еженедельный вопрос --------------------------------------------
+// --- Weight: history, chart, weekly prompt --------------------------------------------
 const WEEK = 7 * 86400e3;
 let weights = [];
 
@@ -400,7 +400,7 @@ async function saveWeight(kg) {
   });
   if (!r.ok) { toast((await r.json()).error || "не сохранено"); return; }
   $("weightDlg").close();
-  await loadProfiles(); // вес профиля обновился — по нему считаются калории
+  await loadProfiles(); // the profile's weight was updated — calories are calculated from it
 }
 
 $("wAdd").onclick = () => openWeight(false);
@@ -422,5 +422,5 @@ window.onProfileChanged = () => {
   if (active && active.dataset.tab !== "workout") showTab(active.dataset.tab);
 };
 
-// Ссылка вида /treadmill/#hub открывает нужную вкладку (все скрипты уже загружены)
+// A link like /treadmill/#hub opens the right tab (all scripts are already loaded)
 window.addEventListener("load", () => { if (location.hash) showTab(location.hash.slice(1)); });

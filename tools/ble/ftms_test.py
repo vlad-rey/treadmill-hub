@@ -1,10 +1,10 @@
-"""Первая проверка управления дорожкой через FTMS Control Point.
+"""First check of treadmill control via the FTMS Control Point.
 
-    python ftms_test.py <адрес>
+    python ftms_test.py <address>
 
-ВНИМАНИЕ: лента поедет. Запускать только когда человек стоит рядом (не на ленте),
-ключ безопасности на месте. Жёсткие лимиты: скорость <= 3.0 км/ч, наклон <= 3 %.
-При любой ошибке или Ctrl+C отправляется Stop.
+WARNING: the belt will move. Run this only with a person standing nearby (not on the belt),
+with the safety key in place. Hard limits: speed <= 3.0 km/h, incline <= 3 %.
+Stop is sent on any error or Ctrl+C.
 """
 
 import asyncio
@@ -23,7 +23,7 @@ MACHINE_STATUS = "00002ada-0000-1000-8000-00805f9b34fb"
 TRAINING_STATUS = "00002ad3-0000-1000-8000-00805f9b34fb"
 FITSHOW_NOTIFY = "0000fff1-0000-1000-8000-00805f9b34fb"
 
-RESULTS = {1: "OK", 2: "не поддерживается", 3: "неверный параметр", 4: "ошибка", 5: "управление не разрешено"}
+RESULTS = {1: "OK", 2: "not supported", 3: "invalid parameter", 4: "operation failed", 5: "control not permitted"}
 
 
 def ts() -> str:
@@ -32,28 +32,28 @@ def ts() -> str:
 
 def decode_treadmill(data: bytes) -> str:
     flags = int.from_bytes(data[0:2], "little")
-    if flags & 1:  # More Data — во втором пакете нет скорости
-        return f"(доп. пакет flags=0x{flags:04x} {data[2:].hex(' ')})"
+    if flags & 1:  # More Data — the second packet has no speed
+        return f"(extra packet flags=0x{flags:04x} {data[2:].hex(' ')})"
     i = 2
     out = []
     speed = int.from_bytes(data[i:i + 2], "little") / 100; i += 2
-    out.append(f"скорость {speed:.2f} км/ч")
+    out.append(f"speed {speed:.2f} km/h")
     if flags & (1 << 1): i += 2
     if flags & (1 << 2):
-        out.append(f"дистанция {int.from_bytes(data[i:i + 3], 'little')} м"); i += 3
+        out.append(f"distance {int.from_bytes(data[i:i + 3], 'little')} m"); i += 3
     if flags & (1 << 3):
         incl, ramp = struct.unpack_from("<hh", data, i); i += 4
-        out.append(f"наклон {incl / 10:.1f} % ({ramp / 10:.1f}°)")
+        out.append(f"incline {incl / 10:.1f} % ({ramp / 10:.1f}°)")
     if flags & (1 << 4): i += 4
     if flags & (1 << 5): i += 1
     if flags & (1 << 6): i += 1
     if flags & (1 << 7):
-        out.append(f"ккал {int.from_bytes(data[i:i + 2], 'little')}"); i += 5
+        out.append(f"kcal {int.from_bytes(data[i:i + 2], 'little')}"); i += 5
     if flags & (1 << 8):
-        out.append(f"пульс {data[i]}"); i += 1
+        out.append(f"heart rate {data[i]}"); i += 1
     if flags & (1 << 9): i += 1
     if flags & (1 << 10):
-        out.append(f"время {int.from_bytes(data[i:i + 2], 'little')} с"); i += 2
+        out.append(f"time {int.from_bytes(data[i:i + 2], 'little')} s"); i += 2
     return ", ".join(out)
 
 
@@ -72,7 +72,7 @@ class Treadmill:
         try:
             r = await asyncio.wait_for(self.responses.get(), timeout=5)
         except asyncio.TimeoutError:
-            print(f"{ts()}  !! нет ответа на {label}")
+            print(f"{ts()}  !! no response to {label}")
             return False
         ok = len(r) >= 3 and r[0] == 0x80 and r[1] == payload[0] and r[2] == 1
         print(f"{ts()}  {'OK' if ok else '!!'} {label}: {RESULTS.get(r[2] if len(r) > 2 else 0, r.hex())}")
@@ -80,16 +80,16 @@ class Treadmill:
 
     async def speed(self, kmh: float) -> bool:
         if not 0 < kmh <= MAX_SPEED_KMH:
-            raise ValueError(f"скорость {kmh} вне лимита {MAX_SPEED_KMH}")
-        return await self.send(bytes([0x02]) + struct.pack("<H", round(kmh * 100)), f"скорость {kmh} км/ч")
+            raise ValueError(f"speed {kmh} outside limit {MAX_SPEED_KMH}")
+        return await self.send(bytes([0x02]) + struct.pack("<H", round(kmh * 100)), f"speed {kmh} km/h")
 
     async def incline(self, pct: float) -> bool:
         if not 0 <= pct <= MAX_INCLINE_PCT:
-            raise ValueError(f"наклон {pct} вне лимита {MAX_INCLINE_PCT}")
-        return await self.send(bytes([0x03]) + struct.pack("<h", round(pct * 10)), f"наклон {pct} %")
+            raise ValueError(f"incline {pct} outside limit {MAX_INCLINE_PCT}")
+        return await self.send(bytes([0x03]) + struct.pack("<h", round(pct * 10)), f"incline {pct} %")
 
     async def stop(self) -> bool:
-        return await self.send(bytes([0x08, 0x01]), "СТОП")
+        return await self.send(bytes([0x08, 0x01]), "STOP")
 
 
 async def run(address: str) -> None:
@@ -105,7 +105,7 @@ async def run(address: str) -> None:
         started = False
         try:
             if not await tm.send(b"\x00", "Request Control"):
-                print("управление не получено — прерываю, лента не запускалась")
+                print("control not granted — aborting, the belt was not started")
                 return
             started = True
             if not await tm.send(b"\x07", "Start"):
@@ -121,7 +121,7 @@ async def run(address: str) -> None:
             if started:
                 await tm.stop()
                 await asyncio.sleep(6)
-        print(f"{ts()}  тест завершён")
+        print(f"{ts()}  test finished")
 
 
 if __name__ == "__main__":
@@ -129,4 +129,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(run(sys.argv[1]))
     except KeyboardInterrupt:
-        print("прервано")
+        print("interrupted")

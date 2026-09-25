@@ -1,3 +1,3 @@
 # web
 
-PWA-клиент. Появится на этапе 2–3: экраны «Тренировка», «Программы», «История», «Статистика», «Хаб».
+PWA client. Will appear at stage 2–3: screens "Workout", "Programs", "History", "Stats", "Hub".

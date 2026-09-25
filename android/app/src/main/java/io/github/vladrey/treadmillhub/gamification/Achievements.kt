@@ -12,7 +12,7 @@ import kotlin.math.abs
 @Serializable
 enum class Grade { BRONZE, SILVER, GOLD, PLATINUM, LEGEND }
 
-/** Данные для проверки ачивок одного профиля. */
+/** Data for checking a single profile's achievements. */
 class AchievementContext(
     val sessions: List<SessionSummary>,
     val weights: List<WeightEntry>,
@@ -24,7 +24,7 @@ class AchievementContext(
     val totalKcal get() = sessions.sumOf { it.kcalCalc }
     fun day(s: SessionSummary): LocalDate = Instant.ofEpochMilli(s.id).atZone(zone).toLocalDate()
 
-    /** Самая длинная серия дней подряд с тренировкой. */
+    /** Longest streak of consecutive days with a workout. */
     val longestStreak: Int
         get() {
             val days = sessions.filter { it.distanceM >= 100 }.map(::day).toSortedSet()
@@ -35,8 +35,8 @@ class AchievementContext(
 }
 
 /**
- * Ачивка. [progress] — от 0 до 1 для полоски «сколько осталось» (null — достижение «да/нет»).
- * [secret] — до получения показывается как «???».
+ * Achievement. [progress] — from 0 to 1 for the "how much is left" bar (null — pass/fail achievement).
+ * [secret] — shown as "???" until it is earned.
  */
 class Achievement(
     val id: String,
@@ -99,7 +99,7 @@ object Achievements {
             for (w in weeks) { cur = if (prev >= 0 && (w == prev + 1 || (w % 100 == 1 && prev % 100 >= 52))) cur + 1 else 1; best = maxOf(best, cur); prev = w }
             frac(best.toDouble(), 4.0)
         },
-        // --- Секретные и забавные ---
+        // --- Secret and fun ---
         Achievement("turtle", "🐢", "Черепаха", "10 минут подряд на 1 км/ч", Grade.SILVER, secret = true) { frac(bestMetric(it) { m -> m.maxRunAtWalkingMinS }, 600.0) },
         Achievement("cinderella", "🕛", "Золушка", "Тренировка, которая перешла через полночь", Grade.GOLD, secret = true) { any(it) { m -> m.crossedMidnight } },
         Achievement("coffee", "☕", "Кофе-брейк", "Пауза дольше 5 минут — и продолжить", Grade.BRONZE, secret = true) { any(it) { m -> m.maxResumedPauseS >= 300 } },

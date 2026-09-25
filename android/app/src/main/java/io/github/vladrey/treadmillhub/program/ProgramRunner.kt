@@ -20,9 +20,9 @@ data class ProgramStatus(
 )
 
 /**
- * Выполнение программы. Чистая логика без BLE: [tick] получает фазу дорожки и прошедшее время,
- * возвращает команды, которые хаб должен отправить. Время программы идёт только в движении —
- * на паузе и при потере связи программа стоит.
+ * Program execution. Pure logic with no BLE: [tick] takes the treadmill phase and elapsed time,
+ * and returns commands the hub should send. Program time only advances while running — it's
+ * frozen on pause or connection loss.
  */
 class ProgramRunner(val id: String, val name: String, val segments: List<Segment>) {
     var state = RunState.WAITING
@@ -44,10 +44,10 @@ class ProgramRunner(val id: String, val name: String, val segments: List<Segment
                     return enter(0)
                 }
                 waitedS += dtS
-                if (waitedS > 20) state = RunState.CANCELLED // дорожка так и не поехала
+                if (waitedS > 20) state = RunState.CANCELLED // treadmill never started moving
             }
             RunState.RUNNING -> {
-                // Остановили с пульта или кнопкой — программа прекращается
+                // Stopped from the console or a button — the program is cancelled
                 if (phase == Phase.IDLE || phase == Phase.FINISHED || phase == Phase.STOPPING) {
                     state = RunState.CANCELLED
                     return emptyList()

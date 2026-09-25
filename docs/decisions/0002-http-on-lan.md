@@ -1,23 +1,23 @@
-# 0002. HTTP в локальной сети и флаг Chrome вместо HTTPS
+# 0002. HTTP on the LAN and a Chrome flag instead of HTTPS
 
-Статус: принято, 2026-09-24
+Status: accepted, 2026-09-24
 
-## Контекст
+## Context
 
-Для установки PWA и работы service worker нужен защищённый контекст (HTTPS или localhost). Хаб доступен по адресу вида `http://192.168.x.x:8080`. Оба клиента — Pixel с Chrome. Доступ нужен только из дома.
+Installing a PWA and running a service worker requires a secure context (HTTPS or localhost). The hub is reachable at an address like `http://192.168.x.x:8080`. Both clients are Pixels running Chrome. Access is needed only from home.
 
-## Рассмотренные варианты
+## Options considered
 
-1. Tailscale + `tailscale cert`: на всех устройствах нужен Tailscale. Избыточно для доступа только из дома.
-2. Свой домен + Let's Encrypt (DNS-01) + A-запись на локальный IP: домен и обновление сертификата. Часть роутеров блокирует DNS-ответы с приватными адресами.
-3. HTTP и ярлык на главном экране: работает сразу, но без service worker.
-4. HTTP + флаг `chrome://flags/#unsafely-treat-insecure-origin-as-secure` с адресом хаба на каждом Pixel: Chrome считает адрес защищённым, PWA ставится полноценно.
+1. Tailscale + `tailscale cert`: requires Tailscale on every device. Overkill for home-only access.
+2. Our own domain + Let's Encrypt (DNS-01) + an A record pointing to the local IP: needs a domain and certificate renewal. Some routers block DNS responses with private addresses.
+3. HTTP with a home-screen shortcut: works immediately, but without a service worker.
+4. HTTP + the `chrome://flags/#unsafely-treat-insecure-origin-as-secure` flag with the hub's address on each Pixel: Chrome treats the address as secure, and the PWA installs fully.
 
-## Решение
+## Decision
 
-Старт — вариант 3, затем 4. PWA сразу собирается с манифестом и service worker, чтобы переход на HTTPS (вариант 2) не требовал переделок.
+Start with option 3, then move to option 4. The PWA is built from the start with a manifest and a service worker, so a later move to HTTPS (option 2) won't require rework.
 
-## Последствия
+## Consequences
 
-- У хаба должен быть постоянный IP (резервирование DHCP в роутере).
-- Флаг иногда сбрасывается при обновлении Chrome, тогда его нужно выставить снова.
+- The hub needs a stable IP (DHCP reservation on the router).
+- The flag sometimes gets reset when Chrome updates and needs to be set again.

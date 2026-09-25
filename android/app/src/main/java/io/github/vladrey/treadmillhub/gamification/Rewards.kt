@@ -13,7 +13,7 @@ import java.time.temporal.TemporalAdjusters
 @Serializable
 enum class Period { WEEK, MONTH }
 
-/** Реальная награда: за [km] км за неделю/месяц. Выдаётся заново каждый период. */
+/** Real reward: for [km] km per week/month. Re-awarded every period. */
 @Serializable
 data class RewardDef(
     val id: String,
@@ -22,7 +22,7 @@ data class RewardDef(
     val icon: String,
     val period: Period,
     val km: Double,
-    /** "sound" — окно и звук; "fireworks" — ещё и фейерверк. */
+    /** "sound" — popup and sound; "fireworks" — also fireworks. */
     val effect: String = "sound",
 )
 
@@ -30,7 +30,7 @@ data class RewardDef(
 data class RewardEarned(
     val rewardId: String,
     val profileId: String,
-    /** «2026-W39» или «2026-09». */
+    /** "2026-W39" or "2026-09". */
     val periodKey: String,
     val atMs: Long,
     val delivered: Boolean = false,
@@ -39,7 +39,7 @@ data class RewardEarned(
 @Serializable
 data class AchievementEarned(val profileId: String, val achievementId: String, val atMs: Long)
 
-/** Всплывающее окно на телефоне профиля: реальная награда или ачивка. Живёт до подтверждения. */
+/** Popup on the profile's phone: a real reward or an achievement. Lives until acknowledged. */
 @Serializable
 data class Celebration(
     val id: String,
@@ -72,7 +72,7 @@ object Periods {
     }
 }
 
-/** Хранилище: определения наград, выданные награды и ачивки, разовые события («Передумал»). */
+/** Storage: reward definitions, awarded rewards and achievements, one-off events ("Changed mind"). */
 class GameStore(private val dir: File) {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
@@ -81,7 +81,7 @@ class GameStore(private val dir: File) {
         val rewards: List<RewardDef> = emptyList(),
         val rewardsEarned: List<RewardEarned> = emptyList(),
         val achievements: List<AchievementEarned> = emptyList(),
-        val events: Map<String, List<String>> = emptyMap(),   // profileId → события
+        val events: Map<String, List<String>> = emptyMap(),   // profileId → events
         val pending: List<Celebration> = emptyList(),
     )
 

@@ -7,9 +7,9 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
- * Свет есть / нет по данным станции, с защитой от дребезга: смена состояния засчитывается,
- * когда новое состояние держится [confirmMs]. Возвращает текст сообщения для Telegram или null.
- * Без света — предупреждения, когда батарея станции опускается до 20 % и 10 %.
+ * Grid power on/off based on station data, debounced: a state change is confirmed once the new
+ * state holds for [confirmMs]. Returns the Telegram message text, or null.
+ * While there's no power — warnings when the station's battery drops to 20% and 10%.
  */
 class GridWatch(
     private val capacityWh: Double = 2048.0,     // Fossibot F2400
@@ -29,7 +29,7 @@ class GridWatch(
         if (!s.connected) return null
         val now = s.updatedAtMs
 
-        if (gridOn == null) { gridOn = g; changedAtMs = now; return null } // первое известное состояние — без сообщения
+        if (gridOn == null) { gridOn = g; changedAtMs = now; return null } // first known state — no message
 
         if (g != gridOn) {
             if (candidate != g) { candidate = g; candidateSinceMs = now }
@@ -68,7 +68,7 @@ class GridWatch(
     private fun hoursLeft(s: StationState): String {
         val soc = s.socPct ?: return "?"
         if (s.outputW <= 5) return "много часов"
-        val h = capacityWh * soc / 100 * 0.9 / s.outputW   // ~90 % КПД инвертора
+        val h = capacityWh * soc / 100 * 0.9 / s.outputW   // ~90% inverter efficiency
         return if (h >= 1) String.format(Locale.ROOT, "%.1f ч", h).replace('.', ',') else "${(h * 60).roundToInt()} мин"
     }
 

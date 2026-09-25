@@ -16,17 +16,17 @@ data class RouterStatus(
     val connected: Boolean = false,
     val model: String? = null,
     val error: String? = null,
-    /** Неверный пароль: хаб не пробует снова, пока не введут новый (иначе роутер заблокирует вход). */
+    /** Wrong password: the hub won't retry until a new one is entered (otherwise the router locks out logins). */
     val waitingForPassword: Boolean = false,
     val lastOkMs: Long = 0,
     val clients: Int = 0,
     val online: Int = 0,
-    /** Средняя скорость интернета между опросами, Мбит/с. */
+    /** Average internet speed between polls, Mbps. */
     val wanDownMbps: Double? = null,
     val wanUpMbps: Double? = null,
 )
 
-/** Опрос роутера ASUS раз в [intervalMs]: модель, клиенты, трафик. Логин и пароль — в настройках хаба. */
+/** Polls the ASUS router every [intervalMs]: model, clients, traffic. Login and password are in the hub settings. */
 class RouterWatch(private val config: HubConfig, private val host: () -> String?, private val intervalMs: Long = 5 * 60_000L) {
     @Volatile var status = RouterStatus(configured = config.routerPassword != null, user = config.routerUser)
         private set
@@ -46,7 +46,7 @@ class RouterWatch(private val config: HubConfig, private val host: () -> String?
         }
     }
 
-    /** Новые логин и пароль: сразу пробуем войти. Пустой пароль — отключить роутер. */
+    /** New login and password: try logging in right away. An empty password disables the router. */
     fun setCredentials(user: String, password: String?) {
         synchronized(this) {
             client?.logout()
@@ -61,7 +61,7 @@ class RouterWatch(private val config: HubConfig, private val host: () -> String?
         wake.trySend(Unit)
     }
 
-    /** Действие с роутером от имени хаба (отладка, замер скорости); null — роутер не настроен. */
+    /** An action against the router on behalf of the hub (debugging, speed test); null — router not configured. */
     fun <T> use(block: (AsusRouter) -> T): T? = synchronized(this) { connect()?.let(block) }
 
     private fun connect(): AsusRouter? {

@@ -3,16 +3,16 @@ package io.github.vladrey.treadmillhub
 import android.content.Context
 import kotlinx.serialization.Serializable
 
-/** Настройки хаба. Хранятся на телефоне (SharedPreferences), не в репозитории. */
+/** Hub settings. Stored on the phone (SharedPreferences), not in the repository. */
 class HubConfig(context: Context) {
     private val prefs = context.getSharedPreferences("hub", Context.MODE_PRIVATE)
 
-    /** MAC дорожки. Если не задан — хаб ищет устройство с сервисом FTMS. */
+    /** Treadmill MAC address. If not set, the hub scans for a device with the FTMS service. */
     var deviceAddress: String?
         get() = prefs.getString("deviceAddress", null)
         set(v) = prefs.edit().putString("deviceAddress", v).apply()
 
-    /** "ftms" — реальная дорожка, "sim" — симулятор. Меняется с перезапуском сервиса. */
+    /** "ftms" — real treadmill, "sim" — simulator. Takes effect on service restart. */
     var backend: String
         get() = prefs.getString("backend", "ftms")!!
         set(v) = prefs.edit().putString("backend", v).apply()
@@ -21,14 +21,14 @@ class HubConfig(context: Context) {
         get() = prefs.getFloat("weightKg", 75f).toDouble()
         set(v) = prefs.edit().putFloat("weightKg", v.toFloat()).apply()
 
-    /** Лимит скорости для команд с хаба (дорожка умеет до 16 км/ч). */
+    /** Speed limit for commands from the hub (the treadmill supports up to 16 km/h). */
     var maxSpeedKmh: Double
         get() = prefs.getFloat("maxSpeedKmh", 12f).toDouble()
         set(v) = prefs.edit().putFloat("maxSpeedKmh", v.toFloat()).apply()
 
     val port: Int get() = prefs.getInt("port", 8080)
 
-    /** Telegram: токен бота и chat id владельца. Хранятся только на телефоне. */
+    /** Telegram: bot token and the owner's chat id. Stored only on the phone. */
     var telegramToken: String?
         get() = prefs.getString("telegramToken", null)
         set(v) = prefs.edit().putString("telegramToken", v).apply()
@@ -36,7 +36,7 @@ class HubConfig(context: Context) {
         get() = prefs.getString("telegramChatId", null)
         set(v) = prefs.edit().putString("telegramChatId", v).apply()
 
-    /** Роутер ASUS: логин и пароль администратора. Хранятся только на телефоне, наружу не отдаются. */
+    /** ASUS router: admin login and password. Stored only on the phone, never exposed. */
     var routerUser: String?
         get() = prefs.getString("routerUser", null)
         set(v) = prefs.edit().putString("routerUser", v).apply()
@@ -63,7 +63,7 @@ class HubConfig(context: Context) {
 @Serializable
 data class ConfigDto(
     val deviceAddress: String?, val backend: String, val weightKg: Double, val maxSpeedKmh: Double,
-    /** Сам токен наружу не отдаём — только признак, что он задан. */
+    /** The token itself is never exposed — only a flag that it's set. */
     val telegramConfigured: Boolean = false, val telegramChatId: String? = null,
 )
 

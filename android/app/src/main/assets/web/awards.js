@@ -1,18 +1,18 @@
 "use strict";
-// Награды: реальные награды, прогресс близких, ачивки; праздничные окна со звуком и фейерверком.
-// Использует общие функции из app.js / programs.js: $, me, profiles, esc, showTab.
+// Rewards: real-world rewards, progress of family members, achievements; celebration popups with sound and fireworks.
+// Uses shared functions from app.js / programs.js: $, me, profiles, esc, showTab.
 
 const GRADE = { BRONZE: "Бронза", SILVER: "Серебро", GOLD: "Золото", PLATINUM: "Платина", LEGEND: "Легенда" };
 const PERIOD = { WEEK: "за неделю", MONTH: "за месяц" };
 const GRADE_ORDER = ["LEGEND", "PLATINUM", "GOLD", "SILVER", "BRONZE"];
 
-// --- Вкладка «Награды» -------------------------------------------------------------------
+// --- "Rewards" tab -------------------------------------------------------------------
 async function loadAwards() {
   if (!me) return;
   const mine = await (await fetch("/api/game/" + encodeURIComponent(me.id))).json();
   $("myRewards").innerHTML = mine.rewards.length ? "<h3>Мои награды</h3>" + mine.rewards.map((r) => rewardCard(r, false)).join("") : "";
 
-  // Реальные награды других профилей: видно прогресс и что пора вручать (без всплывающих окон)
+  // Real-world rewards of other profiles: shows progress and what's ready to hand out (no popups)
   const others = await Promise.all(profiles.filter((p) => p.id !== me.id).map((p) =>
     fetch("/api/game/" + encodeURIComponent(p.id)).then((r) => r.json()).then((g) => ({ p, g }))));
   $("othersRewards").innerHTML = others.filter((o) => o.g.rewards && o.g.rewards.length)
@@ -41,9 +41,9 @@ function rewardCard(r, canDeliver) {
   </div>`;
 }
 
-// Мягкие переносы (U+00AD) в длинных (от 11 букв) русских словах: узкая плитка (~100 px) не вмещает
-// «Перфекционист», а hyphens: auto есть не во всех браузерах (на компьютере часто нет словаря).
-// Упрощённые правила слогоделения: гласная|согласная+гласная, согласная|согласная+гласная, после Й/Ь/Ъ.
+// Soft hyphens (U+00AD) in long (11+ letter) Russian words: a narrow tile (~100 px) can't fit
+// "Перфекционист" (Perfectionist), and hyphens: auto isn't supported in every browser (desktop often lacks the dictionary).
+// Simplified syllable-splitting rules: vowel|consonant+vowel, consonant|consonant+vowel, after Й/Ь/Ъ.
 const VOWELS = "аеёиоуыэюя";
 function softHyphens(text) {
   return text.replace(/[а-яё]{11,}/gi, (w) => {
@@ -53,9 +53,9 @@ function softHyphens(text) {
     for (let i = 1; i < w.length; i++) {
       const left = w.slice(0, i), right = w.slice(i);
       const ok = left.length >= 2 && right.length >= 3 && /[аеёиоуыэюя]/i.test(left) && /[аеёиоуыэюя]/i.test(right) && !sign(i) && (
-        (v(i - 1) && !v(i) && v(i + 1)) ||                          // во|да
-        (!v(i - 1) && !sign(i - 1) && !v(i) && v(i + 1) && v(i - 2)) || // пер|фект
-        sign(i - 1));                                                 // конь|ки
+        (v(i - 1) && !v(i) && v(i + 1)) ||                          // vo|da ("water")
+        (!v(i - 1) && !sign(i - 1) && !v(i) && v(i + 1) && v(i - 2)) || // per|fekt (as in "perfektsionist")
+        sign(i - 1));                                                 // kon'|ki ("skates")
       out += (ok ? "\u00AD" : "") + w[i];
     }
     return out;
@@ -69,8 +69,8 @@ function renderAchievements(list) {
     (b.earnedAtMs ? 1 : 0) - (a.earnedAtMs ? 1 : 0) ||
     GRADE_ORDER.indexOf(a.grade) - GRADE_ORDER.indexOf(b.grade) ||
     b.progress - a.progress);
-  // Порядок в плитке: иконка → грейд (метка под иконкой) → название → описание → полоска прогресса внизу.
-  // В описании число не отрывается от следующего слова («10 м») и «км/ч» не рвётся по «/».
+  // Tile order: icon → grade (label under the icon) → title → description → progress bar at the bottom.
+  // In the description, a number doesn't wrap away from the next word ("10 m") and "km/h" doesn't break at the "/".
   $("achGrid").innerHTML = sorted.map((a) => {
     const hidden = a.secret && !a.earnedAtMs;
     const title = hidden ? "???" : a.title;
@@ -98,13 +98,13 @@ document.addEventListener("click", async (e) => {
   loadAwards();
 });
 
-// --- Звук: синтез в браузере, без файлов. Контекст открывается первым касанием экрана ----------
+// --- Sound: synthesized in the browser, no files. The audio context opens on the first screen touch ----------
 let audioCtx = null;
 document.addEventListener("pointerdown", () => {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === "suspended") audioCtx.resume();
-  } catch (_) { /* без звука */ }
+  } catch (_) { /* no sound */ }
 }, { capture: true });
 
 function playNotes(notes) {
@@ -132,7 +132,7 @@ const SOUNDS = {
     [G5, 1.02, 1.2, "square", 0.05], [C6, 1.9, 0.2], [E6, 2.1, 0.2], [G6, 2.3, 1.2]],
 };
 
-// --- Фейерверк на canvas ---------------------------------------------------------------------
+// --- Fireworks on canvas ---------------------------------------------------------------------
 let fw = null;
 function startFireworks(seconds = 7) {
   const cv = $("fireworks"), ctx = cv.getContext("2d");
@@ -169,7 +169,7 @@ function stopFireworks() {
   cv.getContext("2d").clearRect(0, 0, cv.width, cv.height);
 }
 
-// --- Очередь праздничных окон: только для своего профиля ------------------------------------
+// --- Celebration popup queue: only for your own profile ------------------------------------
 const celebrationQueue = [];
 const celebrationSeen = new Set();
 let celebrationShowing = null;

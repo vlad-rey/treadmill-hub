@@ -2,7 +2,7 @@ package io.github.vladrey.treadmillhub.net
 
 import kotlinx.serialization.Serializable
 
-/** Результат замера скорости интернета (источник — роутер, подключение в планах). */
+/** Internet speed test result (source — router; more connections planned). */
 @Serializable
 data class SpeedResult(
     val atMs: Long,
