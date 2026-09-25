@@ -4,12 +4,17 @@ import io.github.vladrey.treadmillhub.power.GridWatch
 import io.github.vladrey.treadmillhub.power.StationCodec
 import io.github.vladrey.treadmillhub.power.StationSettings
 import io.github.vladrey.treadmillhub.power.StationState
+import io.github.vladrey.treadmillhub.power.StationStatsStore
+import io.github.vladrey.treadmillhub.power.StationStatsTracker
+import io.github.vladrey.treadmillhub.power.StationTotals
 import io.github.vladrey.treadmillhub.treadmill.toHex
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
+import java.time.LocalDateTime
 import java.time.ZoneId
 
 class PowerTest {
@@ -58,5 +63,51 @@ class PowerTest {
         assertTrue(on.startsWith("💡 Свет включили"))
         assertTrue(on.contains("не было 59 мин"))
         assertTrue(on.contains("800 Вт"))
+    }
+
+    @Test fun statsCountPercentEnergyChargeSessionsAndOutages() {
+        val zone = ZoneId.of("Europe/Kyiv")
+        val file = File.createTempFile("stats", ".json").apply { delete() }
+        val store = StationStatsStore(file, zone)
+        val t = StationStatsTracker("a", store)
+        val t0 = LocalDateTime.of(2026, 9, 21, 10, 0).atZone(zone).toInstant().toEpochMilli() // понедельник
+        fun st(s: Int, soc: Double, charge: Int, out: Int) =
+            StationState(connected = true, socPct = soc, acChargeW = charge, outputW = out, updatedAtMs = t0 + s * 10_000L)
+        // 6 опросов зарядки по 360 Вт: 50 → 52,5 %
+        for (i in 0..5) t.onState(st(i, 50 + i * 0.5, 360, 0), gridOn = true, outageStarted = false)
+        // Свет пропал: 3 опроса разрядки по 720 Вт
+        t.onState(st(6, 52.0, 0, 720), gridOn = false, outageStarted = true)
+        t.onState(st(7, 51.0, 0, 720), gridOn = false, outageStarted = false)
+        t.onState(st(8, 50.5, 0, 720), gridOn = false, outageStarted = false)
+        t.onState(st(8, 50.5, 0, 720), gridOn = false, outageStarted = false) // тот же опрос — не считается дважды
+        // Свет вернулся, зарядка снова
+        t.onState(st(9, 50.5, 400, 0), gridOn = true, outageStarted = false)
+        t.onState(st(10, 51.0, 400, 0), gridOn = true, outageStarted = false)
+
+        val p = store.periods("a", t0)
+        with(p.today) {
+            assertEquals(2, chargeSessions)
+            assertEquals(3.0, chargedPct, 1e-9)            // 2,5 + 0,5
+            assertEquals(2.0, dischargedPct, 1e-9)         // 52,5 → 50,5
+            assertEquals(1, outages)
+            assertEquals(30.0, outageS, 1e-9)              // опросы 6, 7, 8
+            assertEquals(360 * 50 / 3600.0 + 400 * 20 / 3600.0, chargedWh, 1e-9)
+            assertEquals(720 * 30 / 3600.0, offgridOutputWh, 1e-9)
+            assertEquals(0.03, fullCycles, 1e-9)
+        }
+        assertEquals(p.today, p.all)
+        assertEquals("2026-09-21", p.sinceDate)
+
+        // Сохранение, перечитывание и границы периодов
+        store.add("a", t0 - 86_400_000L, StationTotals(outages = 1))            // воскресенье — прошлая неделя
+        store.add("a", LocalDateTime.of(2026, 6, 30, 12, 0).atZone(zone).toInstant().toEpochMilli(), StationTotals(outages = 1)) // прошлый квартал
+        store.flush()
+        val p2 = StationStatsStore(file, zone).periods("a", t0)
+        assertEquals(1, p2.week.outages)
+        assertEquals(2, p2.month.outages)
+        assertEquals(2, p2.quarter.outages)
+        assertEquals(3, p2.year.outages)
+        assertEquals(3, p2.all.outages)
+        file.delete()
     }
 }

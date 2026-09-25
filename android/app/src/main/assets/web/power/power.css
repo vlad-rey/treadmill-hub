@@ -33,3 +33,11 @@ body.power { padding-bottom: 32px; }
 .stRow { display: grid; grid-template-columns: 1fr 1.3fr 40px; gap: 8px; margin: 8px 0; }
 .stRow input { font: inherit; padding: 9px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); min-width: 0; }
 .stRow .x { background: none; border: 0; color: var(--muted); font-size: 22px; }
+
+.stats { margin: 4px 0 12px; }
+.periods { margin-bottom: 8px; }
+.periods .btn { height: 36px; font-size: 13px; padding: 0 2px; }
+.statGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.statGrid .flow b { font-size: 20px; }
+.statGrid .flow small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+@media (max-width: 420px) { .statGrid { grid-template-columns: repeat(2, 1fr); } }

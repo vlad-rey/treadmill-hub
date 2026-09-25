@@ -7,6 +7,10 @@ const CAPACITY_WH = 2048; // Fossibot F2400
 const SPEED_W = { 1: 300, 2: 500, 3: 700, 4: 900, 5: 1100 };
 let stations = [];
 let busy = false;
+let editRows = null; // копия списка для редактирования: фоновое обновление её не трогает
+const PERIODS = [["today", "День"], ["week", "Неделя"], ["month", "Месяц"], ["quarter", "Квартал"], ["year", "Год"], ["all", "Всё"]];
+let period = "today";
+try { period = localStorage.getItem("powerPeriod") || period; } catch (_) { /* без запоминания */ }
 let toastTimer = 0;
 
 function toast(msg, ok) {
@@ -29,6 +33,34 @@ function runtime(st) {
   if (st.socPct == null || st.outputW <= 5) return "";
   const h = (CAPACITY_WH * st.socPct / 100 * 0.9) / st.outputW;
   return h >= 1 ? `хватит примерно на ${h.toFixed(1).replace(".", ",")} ч` : `хватит примерно на ${Math.round(h * 60)} мин`;
+}
+
+const num = (v, d = 1) => v.toFixed(d).replace(".", ",");
+const kwh = (wh) => wh >= 1000 ? num(wh / 1000, 2) + " кВт·ч" : Math.round(wh) + " Вт·ч";
+function dur(sec) {
+  const m = Math.round(sec / 60);
+  if (m < 60) return m + " мин";
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h} ч ${m % 60} мин` : `${Math.floor(h / 24)} д ${h % 24} ч`;
+}
+
+function statsBlock(s) {
+  const p = s.stats, t = p[period];
+  const since = p.sinceDate ? new Date(p.sinceDate + "T00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" }) : null;
+  const tabs = PERIODS.map(([k, label]) => `<button type="button" class="btn ${k === period ? "on" : ""}" data-period="${k}">${label}</button>`).join("");
+  const cell = (label, value, sub = "") => `<div class="flow"><label>${label}</label><b>${value}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
+  return `<div class="stats">
+    <div class="seg periods">${tabs}</div>
+    <div class="statGrid">
+      ${cell("Циклы", num(t.chargedPct / 100, 2), `зарядок от сети: ${t.chargeSessions}`)}
+      ${cell("Заряжено", num(t.chargedPct) + " %", "из сети " + kwh(t.chargedWh))}
+      ${cell("Разряжено", num(t.dischargedPct) + " %", "из батареи " + kwh(t.offgridOutputWh))}
+      ${cell("Отдано", kwh(t.outputWh), "всего на выходах")}
+      ${cell("Отключения света", t.outages, "")}
+      ${cell("Без света", dur(t.outageS), "")}
+    </div>
+    <div class="stFoot">${since ? "Учёт с " + since + ". " : ""}Цикл = 100 % заряда суммарно (например, 2 раза по 50 %).</div>
+  </div>`;
 }
 
 const opt = (list, cur) => list.map(([v, t]) => `<option value="${v}" ${v === cur ? "selected" : ""}>${t}</option>`).join("");
@@ -60,6 +92,7 @@ function card(s) {
       <div class="flow"><label>Выход</label><b>${st.outputW} Вт</b></div>
       <div class="flow"><label>Зарядка</label><b>${st.acChargeW} Вт</b></div>
     </div>
+    ${statsBlock(s)}
 
     <div class="setRow"><span>Выходы</span><div class="seg">${toggle("acOutput", "AC")}${toggle("dcOutput", "DC")}${toggle("usbOutput", "USB")}</div></div>
     <div class="setRow"><span>Зарядка, Вт</span><div class="seg">${speed}</div></div>
@@ -76,7 +109,8 @@ function card(s) {
 
 async function load() {
   // Не перерисовываем, пока пользователь выбирает значение в списке или идёт запись
-  if (busy || (document.activeElement && document.activeElement.tagName === "SELECT")) return;
+  const a = document.activeElement;
+  if (busy || (a && a.tagName === "SELECT" && a.closest("#stations"))) return;
   try {
     stations = await (await fetch("/api/power")).json();
     $("stations").innerHTML = stations.length ? stations.map(card).join("")
@@ -105,6 +139,13 @@ async function writeSetting(id, key, value) {
 }
 
 document.addEventListener("click", (e) => {
+  const per = e.target.closest("[data-period]");
+  if (per) {
+    period = per.dataset.period;
+    try { localStorage.setItem("powerPeriod", period); } catch (_) { /* без запоминания */ }
+    load();
+    return;
+  }
   const b = e.target.closest("[data-set]");
   if (!b || b.disabled) return;
   const [id, key, v] = b.dataset.set.split("|");
@@ -118,29 +159,37 @@ document.addEventListener("change", (e) => {
   sel.blur();
 });
 
-// --- Список станций ---
+// --- Список станций: редактируется копия, на хаб уходит по «Сохранить» ---
 function renderRows() {
-  $("stationRows").innerHTML = stations.map((s, i) => `<div class="stRow">
-      <input data-i="${i}" data-f="name" value="${esc(s.name)}" placeholder="Имя">
-      <input data-i="${i}" data-f="address" value="${esc(s.address)}" placeholder="AA:BB:CC:DD:EE:FF">
+  $("stationRows").innerHTML = editRows.map((s, i) => `<div class="stRow">
+      <input data-i="${i}" data-f="name" value="${esc(s.name)}" placeholder="Имя" maxlength="30" autocomplete="off">
+      <input data-i="${i}" data-f="address" value="${esc(s.address)}" placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off">
       <button type="button" class="x" data-del="${i}" aria-label="Удалить">×</button>
     </div>`).join("");
 }
-document.querySelector(".manage").addEventListener("toggle", (e) => { if (e.target.open) renderRows(); });
-$("stationRows").addEventListener("input", (e) => { const el = e.target; if (el.dataset.f) stations[el.dataset.i][el.dataset.f] = el.value; });
-$("stationRows").addEventListener("click", (e) => { const b = e.target.closest("[data-del]"); if (b) { stations.splice(Number(b.dataset.del), 1); renderRows(); } });
-$("addStation").onclick = () => { stations.push({ id: "", name: "", address: "" }); renderRows(); };
-$("saveStations").onclick = async () => {
-  const r = await fetch("/api/power/stations", {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(stations.map(({ id, name, address }) => ({ id, name, address }))),
-  });
-  const body = await r.json();
-  if (!r.ok) { toast(body.error || "не сохранено"); return; }
-  stations = body;
-  toast("список сохранён", true);
+function startEdit() {
+  editRows = stations.map(({ id, name, address }) => ({ id, name, address }));
   renderRows();
-  load();
+}
+document.querySelector(".manage").addEventListener("toggle", (e) => { if (e.target.open) startEdit(); else editRows = null; });
+$("stationRows").addEventListener("input", (e) => { const el = e.target; if (el.dataset.f) editRows[el.dataset.i][el.dataset.f] = el.value; });
+$("stationRows").addEventListener("click", (e) => { const b = e.target.closest("[data-del]"); if (b) { editRows.splice(Number(b.dataset.del), 1); renderRows(); } });
+$("addStation").onclick = () => { editRows.push({ id: "", name: "", address: "" }); renderRows(); };
+$("saveStations").onclick = async () => {
+  try {
+    const r = await fetch("/api/power/stations", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(editRows.map(({ id, name, address }) => ({ id, name: name.trim(), address: address.trim() }))),
+    });
+    const body = await r.json();
+    if (!r.ok) { toast(body.error || "не сохранено"); return; }
+    stations = body;
+    toast("список сохранён", true);
+    startEdit();
+    load();
+  } catch (_) {
+    toast("хаб недоступен");
+  }
 };
 
 load();

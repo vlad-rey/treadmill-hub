@@ -16,7 +16,7 @@ import java.util.UUID
 data class StationConfig(val id: String = "", val name: String, val address: String)
 
 @Serializable
-data class StationView(val id: String, val name: String, val address: String, val state: StationState)
+data class StationView(val id: String, val name: String, val address: String, val state: StationState, val stats: PeriodStats)
 
 /**
  * Станции Fossibot: список (хранится на хабе), опрос, свет есть/нет → Telegram.
@@ -29,6 +29,8 @@ class PowerHub(private val context: Context, dir: File, private val telegram: Te
         runCatching { json.decodeFromString<List<StationConfig>>(file.readText()) }.getOrDefault(emptyList())
     private val stations = HashMap<String, PowerStation>()
     private val watches = HashMap<String, GridWatch>()
+    private val trackers = HashMap<String, StationStatsTracker>()
+    private val statsStore = StationStatsStore(File(dir, "stations-stats.json"))
     private val pending = ArrayList<Pair<Long, String>>() // (время, текст)
     private lateinit var scope: CoroutineScope
 
@@ -43,17 +45,21 @@ class PowerHub(private val context: Context, dir: File, private val telegram: Te
         }
     }
 
-    fun close() = synchronized(stations) { stations.values.forEach { it.close() } }
+    fun close() {
+        synchronized(stations) { stations.values.forEach { it.close() } }
+        statsStore.flush()
+    }
 
     private fun launch(c: StationConfig) = synchronized(stations) {
         val s = PowerStation(context, c.address)
         stations[c.id] = s
         watches[c.id] = GridWatch()
+        trackers[c.id] = StationStatsTracker(c.id, statsStore)
         s.start(scope)
     }
 
     fun list(): List<StationView> = configs.map { c ->
-        StationView(c.id, c.name, c.address, stations[c.id]?.state?.value ?: StationState())
+        StationView(c.id, c.name, c.address, stations[c.id]?.state?.value ?: StationState(), statsStore.periods(c.id))
     }
 
     /** Замена списка станций: новые подключаются, удалённые отключаются. */
@@ -66,7 +72,7 @@ class PowerHub(private val context: Context, dir: File, private val telegram: Te
         synchronized(stations) {
             val keep = next.associateBy { it.id }
             stations.keys.filter { id -> keep[id]?.address != configs.firstOrNull { it.id == id }?.address || id !in keep }
-                .forEach { id -> stations.remove(id)?.close(); watches.remove(id) }
+                .forEach { id -> stations.remove(id)?.close(); watches.remove(id); trackers.remove(id) }
             configs = next
             next.filter { it.id !in stations }.forEach(::launch)
         }
@@ -84,7 +90,12 @@ class PowerHub(private val context: Context, dir: File, private val telegram: Te
         val multi = configs.size > 1
         for (c in configs) {
             val st = stations[c.id]?.state?.value ?: continue
-            val text = watches[c.id]?.update(st) ?: continue
+            val watch = watches[c.id] ?: continue
+            val wasOn = watch.gridOn
+            val text = watch.update(st)
+            // Отключение засчитывается, когда GridWatch подтвердил его (без дребезга)
+            trackers[c.id]?.onState(st, watch.gridOn, outageStarted = wasOn == true && watch.gridOn == false)
+            if (text == null) continue
             synchronized(pending) { pending += now to (if (multi) "«${c.name}»: " else "") + text }
         }
         synchronized(pending) {

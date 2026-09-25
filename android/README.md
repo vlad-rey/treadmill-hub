@@ -39,6 +39,10 @@ powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 | GET | `/api/programs?profile=ID` | встроенные P1–P8 + свои (общие и профиля) |
 | GET | `/api/programs/{id}/segments?level=&minutes=&profile=` | отрезки для предпросмотра (скорость ≤ лимита профиля) |
 | POST/DELETE | `/api/programs`, `/api/programs/{id}` | свои программы: `{name, profileId, blocks:[{repeat, steps:[{durationS, speedKmh, inclinePct?}]}]}` |
+| GET | `/power/` | страница станций Fossibot F2400: заряд, мощности, настройки, статистика |
+| GET | `/api/power` | станции: `{id, name, address, state, stats}`; `stats` — итоги за `today/week/month/quarter/year/all` (`chargeSessions`, `chargedPct`, `dischargedPct`, `chargedWh`, `outputWh`, `offgridOutputWh`, `outages`, `outageS`) и `sinceDate`; цикл = `chargedPct / 100` |
+| POST | `/api/power/stations` | список станций `[{id, name, address}]` (пустой `id` — новая) |
+| POST | `/api/power/{id}/settings` | `{key, value}` — только разрешённые настройки, с проверкой чтением |
 
 Лимиты проверяются на хабе: скорость 1–min(лимит, 16) км/ч, наклон 0–15 %. `stop` не ждёт в очереди за другими командами.
 
