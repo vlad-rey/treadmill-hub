@@ -36,11 +36,64 @@ async function loadLog() {
   } catch (_) { /* нет связи с хабом */ }
 }
 
+// --- Устройства в Wi-Fi: хаб опрашивает сеть раз в 5 мин; новое незнакомое — сообщение в Telegram ---
+const isRandom = (mac) => (parseInt(mac.slice(0, 2), 16) & 2) === 2;
+function seen(ms) {
+  const m = Math.round((Date.now() - ms) / 60e3);
+  return m < 10 ? "в сети" : m < 60 ? `${m} мин назад` : m < 1440 ? `${Math.round(m / 60)} ч назад` : `${Math.round(m / 1440)} дн назад`;
+}
+let editingDevice = false;
+async function loadDevices() {
+  if (editingDevice) return;
+  try {
+    const d = await (await fetch("/api/net/devices")).json();
+    const online = d.devices.filter((x) => Date.now() - x.lastSeenMs < 10 * 60e3).length;
+    $("devTitle").textContent = `Устройства в сети · ${online} сейчас, ${d.devices.length} всего`;
+    $("devNote").textContent = (d.learnUntilMs > Date.now()
+      ? `Хаб запоминает свои устройства до ${clock(d.learnUntilMs)} — всё, что появится до этого, считается своим. `
+      : "Новое незнакомое устройство — сообщение в Telegram. ") +
+      (d.lastScanMs ? `Проверка раз в 5 мин, последняя в ${hm(d.lastScanMs)}.` : "Первая проверка — через минуту после запуска хаба.");
+    $("devices").innerHTML = d.devices.map((x) => `<div class="device ${x.known ? "" : "new"} ${Date.now() - x.lastSeenMs < 10 * 60e3 ? "" : "off"}">
+        <div class="dMain">
+          <input data-mac="${esc(x.mac)}" value="${esc(x.name || "")}" placeholder="${esc(x.hostname || "без имени")}" maxlength="40" autocomplete="off">
+          <small>${esc(x.ip)} · ${esc(x.mac)}${isRandom(x.mac) ? " · случайный MAC" : ""}${x.hostname && x.name ? " · " + esc(x.hostname) : ""}</small>
+        </div>
+        <div class="dSide">
+          <span class="pill ${Date.now() - x.lastSeenMs < 10 * 60e3 ? "ok" : ""}">${seen(x.lastSeenMs)}</span>
+          ${x.known ? "" : `<button type="button" class="btn small" data-known="${esc(x.mac)}">Своё</button>`}
+        </div>
+      </div>`).join("") || `<p class="muted">Пока никого не видно.</p>`;
+  } catch (_) { /* нет связи с хабом */ }
+}
+async function patchDevice(mac, body) {
+  const r = await fetch(`/api/net/devices/${encodeURIComponent(mac)}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  if (!r.ok) alert((await r.json()).error || "не сохранено");
+}
+$("devices").addEventListener("focusin", (e) => { if (e.target.dataset.mac) editingDevice = true; });
+$("devices").addEventListener("focusout", async (e) => {
+  const el = e.target;
+  if (!el.dataset.mac) return;
+  await patchDevice(el.dataset.mac, { name: el.value.trim() });
+  editingDevice = false;
+  loadDevices();
+});
+$("devices").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.dataset.mac) e.target.blur(); });
+$("devices").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-known]");
+  if (!b) return;
+  await patchDevice(b.dataset.known, { known: true });
+  loadDevices();
+});
+
 async function load() {
   try { render(await (await fetch("/api/state")).json()); }
   catch (_) { $("netWarnings").innerHTML = `<div class="warn bad">Хаб недоступен</div>`; }
 }
 load();
 loadLog();
+loadDevices();
+setInterval(loadDevices, 60e3);
 setInterval(load, 5e3);
 setInterval(loadLog, 30e3);

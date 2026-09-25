@@ -1,6 +1,6 @@
 // Service worker: делает интерфейс устанавливаемым как приложение. Данные всегда берутся с хаба;
 // из кэша — только оболочка страницы, если хаб на секунду недоступен.
-const CACHE = "treadmill-shell-v12";
+const CACHE = "treadmill-shell-v13";
 const SHELL = ["/", "/treadmill/", "/power/", "/static/home/home.css", "/static/home/home.js", "/static/favicon.svg", "/static/sitebar.js", "/static/style.css", "/static/app.js", "/static/programs.js", "/static/awards.js", "/static/manifest.webmanifest", "/static/icon-192.png"];
 
 self.addEventListener("install", (e) => {

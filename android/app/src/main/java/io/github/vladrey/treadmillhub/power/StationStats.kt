@@ -70,6 +70,11 @@ class StationStatsStore(private val file: File, private val zone: ZoneId = ZoneI
         Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
     }
 
+    /** Итоги за даты [from]..[to] включительно. */
+    @Synchronized
+    fun range(stationId: String, from: LocalDate, to: LocalDate): StationTotals =
+        days[stationId].orEmpty().filterKeys { LocalDate.parse(it) in from..to }.values.fold(StationTotals()) { a, b -> a + b }
+
     @Synchronized
     fun periods(stationId: String, nowMs: Long = System.currentTimeMillis()): PeriodStats {
         val m = days[stationId].orEmpty()

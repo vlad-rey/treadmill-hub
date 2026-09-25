@@ -9,6 +9,8 @@ import io.github.vladrey.treadmillhub.gamification.Celebration
 import io.github.vladrey.treadmillhub.gamification.Game
 import io.github.vladrey.treadmillhub.gamification.MetricsCalc
 import io.github.vladrey.treadmillhub.gamification.Telegram
+import io.github.vladrey.treadmillhub.bot.Bot
+import io.github.vladrey.treadmillhub.net.DeviceWatch
 import io.github.vladrey.treadmillhub.net.NetState
 import io.github.vladrey.treadmillhub.net.NetWatch
 import io.github.vladrey.treadmillhub.power.PowerHub
@@ -107,6 +109,8 @@ class Hub(private val context: Context, val config: HubConfig) {
     val telegram = Telegram({ config.telegramToken }, { config.telegramChatId }, File(context.filesDir, "telegram-outbox.json"))
     val power = PowerHub(context, context.filesDir, telegram)
     val net = NetWatch(context, context.filesDir, telegram)
+    val devices = DeviceWatch(context, context.filesDir, telegram)
+    val bot = Bot(this, context.filesDir)
     private val programsDone = mutableListOf<String>()
     private var lastDoneRunner: ProgramRunner? = null
     private var lastLiveCheckMs = 0L
@@ -133,7 +137,9 @@ class Hub(private val context: Context, val config: HubConfig) {
         backend.start(scope)
         power.start(scope)
         net.start(scope)
+        devices.start(scope)
         telegram.start(scope)
+        bot.start(scope)
         scope.launch {
             backend.state.collect { s ->
                 val now = System.currentTimeMillis()

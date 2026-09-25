@@ -30,7 +30,7 @@ class PowerHub(private val context: Context, dir: File, private val telegram: Te
     private val stations = HashMap<String, PowerStation>()
     private val watches = HashMap<String, GridWatch>()
     private val trackers = HashMap<String, StationStatsTracker>()
-    private val statsStore = StationStatsStore(File(dir, "stations-stats.json"))
+    val statsStore = StationStatsStore(File(dir, "stations-stats.json"))
     val outages = OutageLog(File(dir, "outages.json"))
     private val pending = ArrayList<Pair<Long, String>>() // (время, текст)
     private lateinit var scope: CoroutineScope
@@ -59,6 +59,8 @@ class PowerHub(private val context: Context, dir: File, private val telegram: Te
         trackers[c.id] = StationStatsTracker(c.id, statsStore)
         s.start(scope)
     }
+
+    fun configs(): List<StationConfig> = configs
 
     fun list(): List<StationView> = configs.map { c ->
         StationView(c.id, c.name, c.address, stations[c.id]?.state?.value ?: StationState(), statsStore.periods(c.id))

@@ -17,8 +17,9 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+/** [chatId] = null — чат владельца из настроек хаба. */
 @Serializable
-data class OutMessage(val atMs: Long, val text: String)
+data class OutMessage(val atMs: Long, val text: String, val chatId: String? = null)
 
 /**
  * Сообщения владельцу в Telegram. Токен и chat id — в настройках хаба, не в git.
@@ -40,8 +41,10 @@ class Telegram(
     /** Отправить сообщения, оставшиеся в очереди после перезапуска хаба. */
     fun start(scope: CoroutineScope) = synchronized(queue) { if (queue.isNotEmpty()) launchWorker(scope) }
 
-    fun send(scope: CoroutineScope, text: String) = synchronized(queue) {
-        queue.addLast(OutMessage(System.currentTimeMillis(), text))
+    fun send(scope: CoroutineScope, text: String) = sendTo(scope, null, text)
+
+    fun sendTo(scope: CoroutineScope, chatId: String?, text: String) = synchronized(queue) {
+        queue.addLast(OutMessage(System.currentTimeMillis(), text, chatId))
         while (queue.size > MAX_QUEUE) queue.removeFirst()
         persist()
         launchWorker(scope)
@@ -57,7 +60,7 @@ class Telegram(
         while (true) {
             val m = synchronized(queue) { queue.firstOrNull() ?: run { worker = null; null } } ?: return
             val t = token() ?: return
-            val c = chatId() ?: return
+            val c = m.chatId ?: chatId() ?: return
             val code = post(t, c, withDelayNote(m, System.currentTimeMillis()))
             if (code == 200 || code in 400..499 && code != 429) {
                 // 4xx (кроме «слишком часто») не исправится повтором — не зацикливаемся
@@ -72,17 +75,29 @@ class Telegram(
     }
 
     /** Код ответа или -1, если нет связи. */
-    private fun post(t: String, c: String, text: String): Int = runCatching {
-        val conn = URL("https://api.telegram.org/bot$t/sendMessage").openConnection() as HttpURLConnection
+    private fun post(t: String, c: String, text: String): Int =
+        call(t, "sendMessage", mapOf("chat_id" to c, "text" to text))?.first ?: -1
+
+    /** Вызов Bot API (для приёма команд): (код, тело) или null без связи/токена. */
+    fun call(method: String, params: Map<String, String>, readTimeoutMs: Int = 10_000): Pair<Int, String>? =
+        token()?.let { call(it, method, params, readTimeoutMs) }
+
+    private fun call(t: String, method: String, params: Map<String, String>, readTimeoutMs: Int = 10_000): Pair<Int, String>? = runCatching {
+        val conn = URL("https://api.telegram.org/bot$t/$method").openConnection() as HttpURLConnection
         conn.requestMethod = "POST"
         conn.doOutput = true
         conn.connectTimeout = 10_000
-        conn.readTimeout = 10_000
+        conn.readTimeout = readTimeoutMs
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-        val body = "chat_id=${URLEncoder.encode(c, "UTF-8")}&text=${URLEncoder.encode(text, "UTF-8")}"
+        val body = params.entries.joinToString("&") { (k, v) -> "$k=${URLEncoder.encode(v, "UTF-8")}" }
         conn.outputStream.use { it.write(body.toByteArray()) }
-        conn.responseCode.also { conn.disconnect() }
-    }.getOrElse { Log.w("Telegram", "не отправлено: ${it.message}"); -1 }
+        val code = conn.responseCode
+        val text = (if (code < 400) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
+        conn.disconnect()
+        code to text
+    }.getOrElse { Log.w("Telegram", "$method: ${it.message}"); null }
+
+    val ownerChatId: String? get() = chatId()
 
     fun withDelayNote(m: OutMessage, nowMs: Long): String {
         if (nowMs - m.atMs < DELAY_NOTE_MS) return m.text

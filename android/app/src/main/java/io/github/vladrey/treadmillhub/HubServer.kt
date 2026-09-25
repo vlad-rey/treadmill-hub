@@ -4,6 +4,8 @@ import android.content.res.AssetManager
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.github.vladrey.treadmillhub.gamification.RewardDef
+import io.github.vladrey.treadmillhub.net.DevicePatch
+import io.github.vladrey.treadmillhub.net.NetDevice
 import io.github.vladrey.treadmillhub.power.StationConfig
 import io.github.vladrey.treadmillhub.program.CustomProgramInput
 import io.github.vladrey.treadmillhub.program.ProgramInfo
@@ -41,6 +43,9 @@ private data class ProfileRef(val profileId: String? = null)
 private data class DeliveredInput(val delivered: Boolean = true)
 
 @Serializable
+private data class DevicesDto(val devices: List<NetDevice>, val learnUntilMs: Long, val lastScanMs: Long)
+
+@Serializable
 private data class SettingInput(val key: String, val value: Int)
 
 /** HTTP + WebSocket API хаба и статика веб-интерфейса из assets/web. */
@@ -68,6 +73,20 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
             get("/api/power/outages") { call.respondJson(json.encodeToString(hub.power.outageList())) }
             // Сеть: сбои роутера и интернета (текущее состояние — в /api/state → hub.net)
             get("/api/net/outages") { call.respondJson(json.encodeToString(hub.net.outages())) }
+            get("/api/net/devices") {
+                call.respondJson(json.encodeToString(DevicesDto(hub.devices.registry.all(), hub.devices.registry.learnUntilMs(), hub.devices.lastScanMs)))
+            }
+            post("/api/net/devices/{mac}") {
+                val r = runCatching {
+                    hub.devices.registry.patch(call.parameters["mac"].orEmpty(), json.decodeFromString<DevicePatch>(call.receiveText()))
+                        ?: throw NoSuchElementException("нет такого устройства")
+                }
+                r.fold({ call.respondJson(json.encodeToString(it)) }, { call.respondError(it) })
+            }
+            delete("/api/net/devices/{mac}") {
+                if (hub.devices.registry.remove(call.parameters["mac"].orEmpty())) call.respondJson("{}")
+                else call.respondJson("""{"error":"нет такого устройства"}""", HttpStatusCode.NotFound)
+            }
             post("/api/power/stations") {
                 val r = runCatching { hub.power.setConfigs(json.decodeFromString<List<StationConfig>>(call.receiveText())) }
                 r.fold({ call.respondJson(json.encodeToString(it)) }, { call.respondError(it) })

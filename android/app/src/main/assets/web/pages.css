@@ -3,3 +3,14 @@ body.page { padding-bottom: 32px; }
 body.page main { max-width: 1200px; margin: 0 auto; }
 body.page h3 { margin: 18px 2px 8px; font-size: 14px; font-weight: 500; color: var(--muted); }
 @media (min-width: 900px) { body.page .hubGrid { grid-template-columns: repeat(4, 1fr); } }
+
+.device { display: flex; gap: 10px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 8px 12px; }
+.device.new { border-color: #5c4d23; box-shadow: 0 0 16px rgba(217, 154, 28, .18); }
+.device.off { opacity: .6; }
+.dMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dMain input { font: inherit; font-weight: 600; background: transparent; border: 1px solid transparent; border-radius: 8px; color: var(--text); padding: 4px 6px; margin-left: -6px; min-width: 0; }
+.dMain input:hover, .dMain input:focus { border-color: var(--line); background: var(--bg); outline: none; }
+.dMain small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.dSide { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.btn.small { height: 34px; font-size: 14px; padding: 0 12px; border-radius: 10px; }
+@media (min-width: 900px) { #devices { display: grid; grid-template-columns: 1fr 1fr; } }

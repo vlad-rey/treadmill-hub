@@ -45,6 +45,8 @@ powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 | GET | `/api/power` | станции: `{id, name, address, state, stats}`; `stats` — итоги за `today/week/month/quarter/year/all` (`chargeSessions`, `chargedPct`, `dischargedPct`, `chargedWh`, `outputWh`, `offgridOutputWh`, `outages`, `outageS`) и `sinceDate`; цикл = `chargedPct / 100` |
 | GET | `/api/power/outages` | журнал отключений света: `[{stationName, outage: {stationId, startMs, endMs, socStart, socEnd, minSoc, batteryWh, maxOutputW, approximate}}]`, новые сверху |
 | GET | `/api/net/outages` | журнал сбоев сети `[{kind: ROUTER\|INTERNET, startMs, endMs}]`; текущее состояние — `/api/state` → `hub.net` (проверка каждые 20 с: пинг шлюза Wi-Fi, TCP к 1.1.1.1/8.8.8.8/9.9.9.9) |
+| GET | `/api/net/devices` | устройства в Wi-Fi: `{devices: [{mac, ip, name, hostname, firstSeenMs, lastSeenMs, known}], learnUntilMs, lastScanMs}` (опрос /24 раз в 5 мин, ARP; первые сутки — обучение) |
+| POST/DELETE | `/api/net/devices/{mac}` | `{name?, known?}` — имя и «своё»; DELETE — забыть устройство |
 | POST | `/api/power/stations` | список станций `[{id, name, address}]` (пустой `id` — новая) |
 | POST | `/api/power/{id}/settings` | `{key, value}` — только разрешённые настройки, с проверкой чтением |
 
@@ -55,3 +57,10 @@ powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 Сообщения в Telegram идут через очередь (`telegram-outbox.json`): без интернета они ждут и уходят позже с пометкой «отправлено с задержкой».
 
 Иконка приложения рисуется скриптом `tools/icons/make_icons.py` (SVG-фавикон и PNG 32/180/192/512).
+
+### Telegram-бот
+
+Команды принимаются long polling (`getUpdates`). Владелец — чат из настроек хаба; другим чатам доступ открывает владелец (`/allow ID Имя_профиля`), список — `bot.json`.
+- `/status`, `/progress`, `/week`, `/help` — всем, у кого есть доступ; `/charge 100` (50–100, шаг 5, можно номер станции), `/allow`, `/deny`, `/me`, `/chats` — владельцу.
+- Понедельник 09:00 — отчёт за прошлую неделю: владельцу — дом (свет, станции, интернет, тренировки всех), каждому привязанному чату — его дорожка.
+- 19:00 — напоминания о незаработанных наградах: недельные — в чт и сб, месячные — за 7, 3 и 1 день до конца месяца.
