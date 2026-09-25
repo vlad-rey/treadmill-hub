@@ -30,6 +30,9 @@ powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 | GET/POST | `/api/profiles/{id}/weights` | история веса; POST `{kg}` — новая запись и новый текущий вес профиля |
 | GET | `/api/export/sessions.csv?profile=ID`, `/api/sessions/{id}/export?format=tcx\|csv` | экспорт: таблица тренировок; TCX для Strava/Garmin; посекундный CSV |
 | POST | `/api/hub/backup` | отметка скрипта бэкапа на PC |
+| GET | `/api/game/{profileId}` | ачивки (прогресс, получено) и реальные награды профиля (прогресс за период, заработано, вручено) |
+| POST | `/api/game/{profileId}/rewards` | задать реальные награды профиля: `[{id, title, icon, period: WEEK\|MONTH, km, effect: sound\|fireworks}]` |
+| POST | `/api/game/celebrations/{id}/ack`, `/api/game/rewards/{id}/{period}/delivered`, `/api/game/telegram-test` | подтвердить окно; отметить «вручено»; пробное сообщение в Telegram |
 | GET | `/api/stats?profile=ID` | итоги: сегодня / неделя / месяц / всё время |
 | GET | `/api/sessions?profile=ID`, `/api/sessions/{id}` | история (пустой `profile=` — без владельца) |
 | POST | `/api/sessions/{id}/profile`, `/api/sessions/{id}/console` | переназначить владельца; показания пульта для сверки |

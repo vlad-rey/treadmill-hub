@@ -116,6 +116,7 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                 }
                 r.fold({ call.respondJson(json.encodeToString(it)) }, { call.respondError(it) })
             }
+            post("/api/game/telegram-test") { hub.game.telegramTest(); call.respondJson("""{"ok":true}""") }
             post("/api/game/celebrations/{id}/ack") {
                 hub.game.store.ack(call.parameters["id"].orEmpty())
                 hub.refreshCelebrations()

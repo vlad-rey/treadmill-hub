@@ -95,6 +95,8 @@ class Game(
         }
     }
 
+    fun telegramTest() = telegram.send(scope, "✅ Хаб дорожки на связи. Сюда будут приходить реальные награды.")
+
     fun state(profileId: String): GameState {
         val c = ctx(profileId)
         val earned = store.achievements(profileId).associate { it.achievementId to it.atMs }

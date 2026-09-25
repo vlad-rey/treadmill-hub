@@ -121,6 +121,8 @@ class Hub(private val context: Context, val config: HubConfig) {
             _snapshot.value = _snapshot.value.copy(celebrations = game.store.pending())
         }
         _snapshot.value = _snapshot.value.copy(celebrations = game.store.pending())
+        // Ачивки за уже пройденные тренировки (например, после обновления списка ачивок)
+        scope.launch { profiles.all().forEach { p -> runCatching { game.evaluate(p.id) } } }
         backend.start(scope)
         scope.launch {
             backend.state.collect { s ->
