@@ -23,7 +23,7 @@ powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 | GET | `/` | веб-интерфейс |
 | GET | `/api/state` | снимок: `treadmill`, `session`, `hub` |
 | WS | `/ws/live` | тот же снимок при каждом изменении (~1 Гц) |
-| POST | `/api/control` | `{"action": "start\|stop\|pause\|speed\|incline\|speedDelta\|inclineDelta", "value": 5.0}` |
+| POST | `/api/control` | `{"action": "start\|stop\|pause\|speed\|incline\|speedDelta\|inclineDelta\|program\|programEnd", "value": 5.0, "profileId": "…", "programId": "P3", "level": 4, "minutes": 30}` |
 | GET/POST | `/api/config` | `deviceAddress`, `backend` (`ftms`/`sim`), `weightKg`, `maxSpeedKmh` (по умолчанию 12) |
 | WS | `/ws/debug/ble` | сырые BLE-пакеты в hex (для агентов) |
 | GET/POST | `/api/profiles`, `/api/profiles/{id}` | профили: имя, вес, лимит скорости |
