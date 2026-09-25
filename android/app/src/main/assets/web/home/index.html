@@ -15,13 +15,20 @@
   <link rel="stylesheet" href="/static/home/home.css">
 </head>
 <body class="home">
-  <header>
-    <img class="logo" src="/static/favicon.svg" alt="">
-    <b class="pageTitle">Домашний хаб</b>
-    <span class="grow"></span>
-    <span id="clock" class="pill"></span>
-  </header>
+  <nav class="sitebar">
+    <div class="sbInner">
+      <a class="brand on" href="/"><img src="/static/favicon.svg" alt=""><span>Домашний хаб</span></a>
+      <div class="sbLinks">
+      <a href="/treadmill/"><span class="ni">🏃</span><span class="nl">Дорожка</span></a>
+      <a href="/power/"><span class="ni">⚡</span><span class="nl">Станции</span></a>
+      <a href="/net/"><span class="ni">🌐</span><span class="nl">Сеть</span></a>
+      <a href="/hub/"><span class="ni">🖥️</span><span class="nl">Хаб</span></a>
+      </div>
+      <span class="sbClock" id="sbClock"></span>
+    </div>
+  </nav>
 
+  <header class="pagehead"><h1>Главная</h1><span class="muted">дорожка, станции, сеть и хаб — на одной странице</span></header>
   <main class="tiles">
     <a class="tile" id="tTreadmill" href="/treadmill/">
       <div class="tHead"><span class="tIcon">🏃</span><b>Дорожка</b><span class="pill" id="trState">…</span></div>
@@ -31,16 +38,17 @@
       <div class="tHead"><span class="tIcon">⚡</span><b>Станции</b><span class="pill" id="pwState">…</span></div>
       <div class="tBody" id="pwBody"></div>
     </a>
-    <a class="tile" id="tNet" href="/treadmill/#hub">
+    <a class="tile" id="tNet" href="/net/">
       <div class="tHead"><span class="tIcon">🌐</span><b>Сеть</b><span class="pill" id="netState">…</span></div>
       <div class="tBody" id="netBody"></div>
     </a>
-    <a class="tile" id="tHub" href="/treadmill/#hub">
+    <a class="tile" id="tHub" href="/hub/">
       <div class="tHead"><span class="tIcon">🖥️</span><b>Хаб</b><span class="pill" id="hubState">…</span></div>
       <div class="tBody" id="hubBody"></div>
     </a>
   </main>
 
+  <script src="/static/sitebar.js"></script>
   <script src="/static/home/home.js"></script>
 </body>
 </html>

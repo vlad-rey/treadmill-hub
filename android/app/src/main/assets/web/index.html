@@ -14,8 +14,19 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+  <nav class="sitebar">
+    <div class="sbInner">
+      <a class="brand" href="/"><img src="/static/favicon.svg" alt=""><span>Домашний хаб</span></a>
+      <div class="sbLinks">
+      <a href="/treadmill/" class="on" aria-current="page"><span class="ni">🏃</span><span class="nl">Дорожка</span></a>
+      <a href="/power/"><span class="ni">⚡</span><span class="nl">Станции</span></a>
+      <a href="/net/"><span class="ni">🌐</span><span class="nl">Сеть</span></a>
+      <a href="/hub/"><span class="ni">🖥️</span><span class="nl">Хаб</span></a>
+      </div>
+      <span class="sbClock" id="sbClock"></span>
+    </div>
+  </nav>
   <header>
-    <a class="icon homeLink" href="/" aria-label="Меню" title="Меню"><img src="/static/favicon.svg" alt=""></a>
     <button id="profileBtn" class="pill profile">…</button>
     <span id="conn" class="pill">…</span>
     <span id="phase" class="pill muted">—</span>
@@ -30,7 +41,6 @@
     <button data-tab="programs"><span class="ti">📋</span><span class="tl">Программы</span></button>
     <button data-tab="history"><span class="ti">📜</span><span class="tl">История</span></button>
     <button data-tab="awards"><span class="ti">🏆</span><span class="tl">Награды</span></button>
-    <button data-tab="hub"><span class="ti">🖥️</span><span class="tl">Хаб</span></button>
   </nav>
 
   <main>
@@ -119,14 +129,6 @@
       <div class="achGrid" id="achGrid"></div>
     </section>
 
-    <!-- ХАБ: состояние телефона-сервера и связи с дорожкой -->
-    <section id="tab-hub" class="tab hidden">
-      <div id="hubWarnings" class="list"></div>
-      <div class="statsGrid hubGrid" id="hubCards"></div>
-      <a class="btn wide linkbtn" href="/power/">⚡ Станции Fossibot</a>
-      <h3>Журнал сети</h3>
-      <div id="netLog" class="list"></div>
-    </section>
   </main>
 
   <!-- СТАРТ, пока лента стоит; ПАУЗА | СТОП (50/50), пока запущена -->
@@ -261,6 +263,7 @@
     </form>
   </dialog>
 
+  <script src="/static/sitebar.js"></script>
   <script src="/static/app.js"></script>
   <script src="/static/programs.js"></script>
   <script src="/static/awards.js"></script>

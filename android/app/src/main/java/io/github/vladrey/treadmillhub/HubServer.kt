@@ -50,8 +50,9 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
         routing {
             // Главная — меню; дорожка — /treadmill/, станции — /power/
             get("/") { call.respondAsset("home/index.html") }
-            get("/treadmill") { call.respondRedirect("/treadmill/") }
             get("/treadmill/") { call.respondAsset("index.html") }
+            for (page in listOf("hub", "net")) get("/$page/") { call.respondAsset("$page/index.html") }
+            for (page in listOf("treadmill", "power", "hub", "net")) get("/$page") { call.respondRedirect("/$page/") }
             get("/favicon.ico") { call.respondAsset("favicon-32.png") }
             // Service worker должен отдаваться из корня, чтобы управлять всем приложением
             get("/sw.js") { call.respondAsset("sw.js") }
@@ -62,7 +63,6 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
             }
 
             // Станции Fossibot: состояние, список, настройки
-            get("/power") { call.respondAsset("power/index.html") }
             get("/power/") { call.respondAsset("power/index.html") }
             get("/api/power") { call.respondJson(json.encodeToString(hub.power.list())) }
             get("/api/power/outages") { call.respondJson(json.encodeToString(hub.power.outageList())) }

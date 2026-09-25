@@ -1,5 +1,5 @@
 body.power { padding-bottom: 32px; }
-.pageTitle { font-size: 20px; }
+body.power main { max-width: 1200px; margin: 0 auto; }
 .navlink { text-decoration: none; color: var(--text); }
 
 .stationGrid { display: grid; gap: 14px; }

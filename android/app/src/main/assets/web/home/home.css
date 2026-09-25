@@ -1,6 +1,5 @@
-body.home { padding-bottom: 32px; max-width: 960px; }
-.logo { width: 30px; height: 30px; }
-.pageTitle { font-size: 20px; }
+body.home { padding-bottom: 32px; }
+body.home main { max-width: 1200px; margin: 0 auto; }
 .tiles { display: grid; gap: 12px; }
 @media (min-width: 700px) { .tiles { grid-template-columns: 1fr 1fr; } }
 .tile { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; color: var(--text); text-decoration: none; min-height: 132px; }

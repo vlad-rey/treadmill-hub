@@ -21,7 +21,8 @@ powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 | Метод | Путь | Что |
 |---|---|---|
 | GET | `/` | главная: меню с состоянием дорожки, станций, сети и хаба |
-| GET | `/treadmill/` | дорожка (вкладки открываются ссылкой `#programs`, `#history`, `#awards`, `#hub`) |
+| GET | `/treadmill/` | дорожка (вкладки открываются ссылкой `#programs`, `#history`, `#awards`) |
+| GET | `/hub/`, `/net/` | состояние хаба (батарея, память, связь с дорожкой, бэкап); сеть (роутер, интернет, журнал сбоев) |
 | GET | `/api/state` | снимок: `treadmill`, `session`, `hub` |
 | WS | `/ws/live` | тот же снимок при каждом изменении (~1 Гц) |
 | POST | `/api/control` | `{"action": "start\|stop\|pause\|speed\|incline\|speedDelta\|inclineDelta\|program\|programEnd", "value": 5.0, "profileId": "…", "programId": "P3", "level": 4, "minutes": 30}` |

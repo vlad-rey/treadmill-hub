@@ -78,9 +78,6 @@ async function load() {
   }
 }
 
-function tick() { $("clock").textContent = new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }); }
-tick();
-setInterval(tick, 10e3);
 load();
 setInterval(load, 5e3);
 if ("serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("/sw.js").catch(() => {});

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101418">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="description" content="Состояние сервера на Redmi 6: батарея, память, связь с дорожкой, бэкапы">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <title>Хаб · Домашний хаб</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/pages.css">
+</head>
+<body class="page">
+  <nav class="sitebar">
+    <div class="sbInner">
+      <a class="brand" href="/"><img src="/static/favicon.svg" alt=""><span>Домашний хаб</span></a>
+      <div class="sbLinks">
+      <a href="/treadmill/"><span class="ni">🏃</span><span class="nl">Дорожка</span></a>
+      <a href="/power/"><span class="ni">⚡</span><span class="nl">Станции</span></a>
+      <a href="/net/"><span class="ni">🌐</span><span class="nl">Сеть</span></a>
+      <a href="/hub/" class="on" aria-current="page"><span class="ni">🖥️</span><span class="nl">Хаб</span></a>
+      </div>
+      <span class="sbClock" id="sbClock"></span>
+    </div>
+  </nav>
+  <header class="pagehead"><h1>Хаб</h1><span class="muted">Redmi 6 · сервер дома</span></header>
+  <main>
+    <div id="hubWarnings" class="list"></div>
+    <div class="statsGrid hubGrid" id="hubCards"></div>
+  </main>
+  <script src="/static/sitebar.js"></script>
+  <script src="/static/hub/hub.js"></script>
+</body>
+</html>

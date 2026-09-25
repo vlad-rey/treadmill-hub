@@ -1,0 +1,5 @@
+/* Отдельные страницы (хаб, сеть): без нижней панели управления */
+body.page { padding-bottom: 32px; }
+body.page main { max-width: 1200px; margin: 0 auto; }
+body.page h3 { margin: 18px 2px 8px; font-size: 14px; font-weight: 500; color: var(--muted); }
+@media (min-width: 900px) { body.page .hubGrid { grid-template-columns: repeat(4, 1fr); } }

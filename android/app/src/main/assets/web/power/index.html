@@ -15,12 +15,19 @@
   <link rel="stylesheet" href="/static/power/power.css">
 </head>
 <body class="power">
-  <header>
-    <a class="icon homeLink" href="/" aria-label="Меню" title="Меню"><img src="/static/favicon.svg" alt=""></a>
-    <b class="pageTitle">⚡ Станции</b>
-    <span class="grow"></span>
-    <a class="pill navlink" href="/treadmill/">🏃 Дорожка</a>
-  </header>
+  <nav class="sitebar">
+    <div class="sbInner">
+      <a class="brand" href="/"><img src="/static/favicon.svg" alt=""><span>Домашний хаб</span></a>
+      <div class="sbLinks">
+      <a href="/treadmill/"><span class="ni">🏃</span><span class="nl">Дорожка</span></a>
+      <a href="/power/" class="on" aria-current="page"><span class="ni">⚡</span><span class="nl">Станции</span></a>
+      <a href="/net/"><span class="ni">🌐</span><span class="nl">Сеть</span></a>
+      <a href="/hub/"><span class="ni">🖥️</span><span class="nl">Хаб</span></a>
+      </div>
+      <span class="sbClock" id="sbClock"></span>
+    </div>
+  </nav>
+  <header class="pagehead"><h1>Станции</h1><span class="muted">Fossibot F2400 · обновление каждые 3 с</span></header>
 
   <main>
     <div id="stations" class="stationGrid"></div>
@@ -43,6 +50,7 @@
   </main>
 
   <div id="toast" class="toast hidden"></div>
+  <script src="/static/sitebar.js"></script>
   <script src="/static/power/power.js"></script>
 </body>
 </html>
