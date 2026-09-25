@@ -41,9 +41,13 @@ powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 | POST/DELETE | `/api/programs`, `/api/programs/{id}` | свои программы: `{name, profileId, blocks:[{repeat, steps:[{durationS, speedKmh, inclinePct?}]}]}` |
 | GET | `/power/` | страница станций Fossibot F2400: заряд, мощности, настройки, статистика |
 | GET | `/api/power` | станции: `{id, name, address, state, stats}`; `stats` — итоги за `today/week/month/quarter/year/all` (`chargeSessions`, `chargedPct`, `dischargedPct`, `chargedWh`, `outputWh`, `offgridOutputWh`, `outages`, `outageS`) и `sinceDate`; цикл = `chargedPct / 100` |
+| GET | `/api/power/outages` | журнал отключений света: `[{stationName, outage: {stationId, startMs, endMs, socStart, socEnd, minSoc, batteryWh, maxOutputW, approximate}}]`, новые сверху |
+| GET | `/api/net/outages` | журнал сбоев сети `[{kind: ROUTER\|INTERNET, startMs, endMs}]`; текущее состояние — `/api/state` → `hub.net` (проверка каждые 20 с: пинг шлюза Wi-Fi, TCP к 1.1.1.1/8.8.8.8/9.9.9.9) |
 | POST | `/api/power/stations` | список станций `[{id, name, address}]` (пустой `id` — новая) |
 | POST | `/api/power/{id}/settings` | `{key, value}` — только разрешённые настройки, с проверкой чтением |
 
 Лимиты проверяются на хабе: скорость 1–min(лимит, 16) км/ч, наклон 0–15 %. `stop` не ждёт в очереди за другими командами.
 
 **Агентам:** `/api/control` двигает ленту — только с подтверждением владельца (см. `CLAUDE.md`). Для проверок без риска — `backend: "sim"` и перезапуск сервиса.
+
+Сообщения в Telegram идут через очередь (`telegram-outbox.json`): без интернета они ждут и уходят позже с пометкой «отправлено с задержкой».

@@ -1,6 +1,7 @@
 package io.github.vladrey.treadmillhub
 
 import io.github.vladrey.treadmillhub.power.GridWatch
+import io.github.vladrey.treadmillhub.power.OutageLog
 import io.github.vladrey.treadmillhub.power.StationCodec
 import io.github.vladrey.treadmillhub.power.StationSettings
 import io.github.vladrey.treadmillhub.power.StationState
@@ -108,6 +109,28 @@ class PowerTest {
         assertEquals(2, p2.quarter.outages)
         assertEquals(3, p2.year.outages)
         assertEquals(3, p2.all.outages)
+        file.delete()
+    }
+
+    @Test fun outageLogRecordsSocEnergyAndSurvivesReload() {
+        val file = File.createTempFile("outages", ".json").apply { delete() }
+        val log = OutageLog(file)
+        fun st(t: Long, soc: Double, out: Int) = StationState(connected = true, socPct = soc, outputW = out, updatedAtMs = t)
+        log.start("a", 1_000, 80.0)
+        log.start("a", 5_000, 79.0)                              // повторное начало не создаёт вторую запись
+        log.update("a", st(10_000, 79.0, 360))
+        log.update("a", st(20_000, 78.0, 720))
+        log.update("a", st(30_000, 77.5, 360))
+        log.end("a", 40_000, 78.0)
+        val o = OutageLog(file).all().single()
+        assertEquals(1_000, o.startMs)
+        assertEquals(40_000L, o.endMs)
+        assertEquals(80.0, o.socStart!!, 1e-9)
+        assertEquals(77.5, o.minSoc!!, 1e-9)
+        assertEquals(78.0, o.socEnd!!, 1e-9)
+        assertEquals((720 * 10 + 360 * 10) / 3600.0, o.batteryWh, 1e-9)
+        assertEquals(720, o.maxOutputW)
+        assertNull(OutageLog(file).open("a"))
         file.delete()
     }
 }

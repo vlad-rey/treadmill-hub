@@ -41,3 +41,9 @@ body.power { padding-bottom: 32px; }
 .statGrid .flow b { font-size: 20px; }
 .statGrid .flow small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
 @media (max-width: 420px) { .statGrid { grid-template-columns: repeat(2, 1fr); } }
+
+.journal { margin-top: 16px; }
+.outage { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.outage.now { border-color: #6b2a2d; }
+.oHead { display: flex; align-items: center; gap: 8px; justify-content: space-between; margin-bottom: 4px; }
+.outage small { display: block; color: var(--muted); font-size: 13px; }

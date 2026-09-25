@@ -120,6 +120,43 @@ async function load() {
   }
 }
 
+// --- Журнал отключений: записи станций об одном отключении (начало в пределах 3 мин) — одной строкой ---
+let outageShow = 15;
+function groupOutages(list) {
+  const groups = [];
+  for (const v of [...list].sort((a, b) => b.outage.startMs - a.outage.startMs)) {
+    const g = groups.find((x) => Math.abs(x.startMs - v.outage.startMs) <= 180e3 && !x.items.some((i) => i.stationName === v.stationName));
+    if (g) { g.items.push(v); g.startMs = Math.min(g.startMs, v.outage.startMs); } else groups.push({ startMs: v.outage.startMs, items: [v] });
+  }
+  return groups;
+}
+const hm = (ms) => new Date(ms).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+const day = (ms) => new Date(ms).toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "long" });
+const pct = (v) => v == null ? "?" : Math.round(v) + " %";
+function outageRow(g) {
+  const ends = g.items.map((i) => i.outage.endMs);
+  const ongoing = ends.some((e) => e == null);
+  const endMs = ongoing ? Date.now() : Math.max(...ends);
+  const approx = g.items.some((i) => i.outage.approximate) ? " ≈" : "";
+  const endText = ongoing ? "света нет сейчас" : (day(endMs) === day(g.startMs) ? hm(endMs) : day(endMs) + " " + hm(endMs));
+  const lines = g.items.map(({ stationName, outage: o }) =>
+    `<small>${esc(stationName)}: ${pct(o.socStart)} → ${pct(o.socEnd)}` + (o.minSoc != null && o.minSoc < (o.socEnd ?? 0) - 0.5 ? ` (минимум ${pct(o.minSoc)})` : "") +
+    ` · из батареи ${kwh(o.batteryWh)}` + (o.maxOutputW ? ` · пик ${o.maxOutputW} Вт` : "") + `</small>`).join("");
+  return `<div class="outage ${ongoing ? "now" : ""}">
+    <div class="oHead"><b>${day(g.startMs)}, ${hm(g.startMs)} – ${endText}</b><span class="pill ${ongoing ? "bad" : ""}">${dur((endMs - g.startMs) / 1000)}${approx}</span></div>
+    ${lines}
+  </div>`;
+}
+async function loadOutages() {
+  try {
+    const groups = groupOutages(await (await fetch("/api/power/outages")).json());
+    $("outages").innerHTML = groups.length ? groups.slice(0, outageShow).map(outageRow).join("")
+      : `<p class="muted">Отключений пока не было. Запись идёт с момента, как хаб начал следить за станциями.</p>`;
+    $("moreOutages").classList.toggle("hidden", groups.length <= outageShow);
+  } catch (_) { /* хаб недоступен — покажет load() */ }
+}
+$("moreOutages").onclick = () => { outageShow += 30; loadOutages(); };
+
 async function writeSetting(id, key, value) {
   const s = stations.find((x) => x.id === id);
   if (key === "acOutput" && value === 0 && !confirm(`Выключить AC-выход станции «${s ? s.name : id}»? Всё, что в неё включено (например, компьютер), обесточится.`)) return;
@@ -194,3 +231,5 @@ $("saveStations").onclick = async () => {
 
 load();
 setInterval(load, 3000);
+loadOutages();
+setInterval(loadOutages, 30000);

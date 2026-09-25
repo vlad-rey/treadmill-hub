@@ -9,6 +9,8 @@ import io.github.vladrey.treadmillhub.gamification.Celebration
 import io.github.vladrey.treadmillhub.gamification.Game
 import io.github.vladrey.treadmillhub.gamification.MetricsCalc
 import io.github.vladrey.treadmillhub.gamification.Telegram
+import io.github.vladrey.treadmillhub.net.NetState
+import io.github.vladrey.treadmillhub.net.NetWatch
 import io.github.vladrey.treadmillhub.power.PowerHub
 import io.github.vladrey.treadmillhub.program.BuiltinPrograms
 import io.github.vladrey.treadmillhub.program.RunState
@@ -63,6 +65,7 @@ data class HubInfo(
     val link: LinkInfo = LinkInfo(),
     val sessions: Int = 0,
     val lastBackupMs: Long? = null,
+    val net: NetState = NetState(),
 )
 
 @Serializable
@@ -101,8 +104,9 @@ class Hub(private val context: Context, val config: HubConfig) {
     val history = HistoryStore(File(context.filesDir, "sessions"))
     lateinit var game: Game
         private set
-    val telegram = Telegram({ config.telegramToken }, { config.telegramChatId })
+    val telegram = Telegram({ config.telegramToken }, { config.telegramChatId }, File(context.filesDir, "telegram-outbox.json"))
     val power = PowerHub(context, context.filesDir, telegram)
+    val net = NetWatch(context, context.filesDir, telegram)
     private val programsDone = mutableListOf<String>()
     private var lastDoneRunner: ProgramRunner? = null
     private var lastLiveCheckMs = 0L
@@ -128,6 +132,8 @@ class Hub(private val context: Context, val config: HubConfig) {
         scope.launch { profiles.all().forEach { p -> runCatching { game.evaluate(p.id) } } }
         backend.start(scope)
         power.start(scope)
+        net.start(scope)
+        telegram.start(scope)
         scope.launch {
             backend.state.collect { s ->
                 val now = System.currentTimeMillis()
@@ -299,6 +305,7 @@ class Hub(private val context: Context, val config: HubConfig) {
             link = backend.link,
             sessions = history.list().size,
             lastBackupMs = config.lastBackupMs,
+            net = net.state,
         )
     }
 

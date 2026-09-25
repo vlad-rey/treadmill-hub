@@ -60,6 +60,9 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
             get("/power") { call.respondAsset("power/index.html") }
             get("/power/") { call.respondAsset("power/index.html") }
             get("/api/power") { call.respondJson(json.encodeToString(hub.power.list())) }
+            get("/api/power/outages") { call.respondJson(json.encodeToString(hub.power.outageList())) }
+            // Сеть: сбои роутера и интернета (текущее состояние — в /api/state → hub.net)
+            get("/api/net/outages") { call.respondJson(json.encodeToString(hub.net.outages())) }
             post("/api/power/stations") {
                 val r = runCatching { hub.power.setConfigs(json.decodeFromString<List<StationConfig>>(call.receiveText())) }
                 r.fold({ call.respondJson(json.encodeToString(it)) }, { call.respondError(it) })

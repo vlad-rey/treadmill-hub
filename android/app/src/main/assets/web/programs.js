@@ -292,6 +292,8 @@ window.renderHub = function (snap) {
   if (h.memAvailMb != null && h.memAvailMb < 200) warns.push(["", `Мало свободной памяти: ${h.memAvailMb} МБ`]);
   if (h.wifiRssi != null && h.wifiRssi < -80) warns.push(["", `Слабый Wi-Fi у хаба: ${h.wifiRssi} dBm`]);
   if (!h.lastBackupMs || Date.now() - h.lastBackupMs > 3 * 86400e3) warns.push(["", "Бэкап на PC не делался больше 3 дней" + (h.lastBackupMs ? ` (последний ${clock(h.lastBackupMs)})` : "")]);
+  const net = h.net || {};
+  if (net.outage) warns.push(["bad", (net.outage.kind === "ROUTER" ? "Хаб не видит роутер" : "Нет интернета (роутер работает)") + ` с ${clock(net.outage.startMs)}. Сообщения в Telegram уйдут, когда связь вернётся.`]);
   if (t.connection !== "CONNECTED") warns.push(["", "Дорожка не на связи" + (link.lastDisconnectMs ? ` с ${clock(link.lastDisconnectMs)}` : "") + " — вероятно, выключена из сети. Хаб подключится сам после включения."]);
   $("hubWarnings").innerHTML = (warns.length ? warns : [["ok", "Всё в порядке"]])
     .map(([cls, text]) => `<div class="warn ${cls}">${esc(text)}</div>`).join("");
@@ -309,8 +311,29 @@ window.renderHub = function (snap) {
     card("Хранилище", h.storageFreeMb != null ? `${(h.storageFreeMb / 1024).toFixed(1)} ГБ` : "—", "свободно"),
     card("История", `${h.sessions}`, "тренировок сохранено"),
     card("Бэкап на PC", h.lastBackupMs ? ago(h.lastBackupMs) : "не было", h.lastBackupMs ? clock(h.lastBackupMs) : "ежедневно в 23:00"),
+    card("Роутер", net.routerOk == null ? "—" : net.routerOk ? "на связи" : "не отвечает", net.routerMs != null ? `пинг ${net.routerMs} мс` : ""),
+    card("Интернет", net.internetOk == null ? "—" : net.internetOk ? "есть" : "нет", net.internetMs != null ? `подключение ${net.internetMs} мс` : ""),
   ].join("");
+  if (Date.now() - netLogAt > 60e3) loadNetLog();
 };
+
+// --- Журнал сбоев сети: роутер и интернет ---------------------------------------------------
+let netLogAt = 0;
+function netDur(ms) {
+  const m = Math.round(ms / 60e3);
+  return m < 1 ? "меньше минуты" : m < 60 ? `${m} мин` : `${Math.floor(m / 60)} ч ${m % 60} мин`;
+}
+async function loadNetLog() {
+  netLogAt = Date.now();
+  try {
+    const list = await (await fetch("/api/net/outages")).json();
+    $("netLog").innerHTML = list.length ? list.slice(0, 30).map((o) => {
+      const now = o.endMs == null;
+      const what = o.kind === "ROUTER" ? "📶 Роутер недоступен" : "🌐 Нет интернета";
+      return `<div class="warn ${now ? "bad" : ""}">${what}: ${clock(o.startMs)} – ${now ? "сейчас" : new Date(o.endMs).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })} · ${netDur((now ? Date.now() : o.endMs) - o.startMs)}</div>`;
+    }).join("") : `<p class="muted">Сбоев не было. Хаб проверяет роутер и интернет каждые 20 с; сбой засчитывается после трёх неудачных проверок подряд.</p>`;
+  } catch (_) { /* нет связи с хабом */ }
+}
 
 // --- Своя программа на основе встроенной: одинаковые подряд отрезки склеиваются -------------
 $("pdCopy").onclick = () => {

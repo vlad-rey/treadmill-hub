@@ -31,6 +31,7 @@ class PowerHub(private val context: Context, dir: File, private val telegram: Te
     private val watches = HashMap<String, GridWatch>()
     private val trackers = HashMap<String, StationStatsTracker>()
     private val statsStore = StationStatsStore(File(dir, "stations-stats.json"))
+    val outages = OutageLog(File(dir, "outages.json"))
     private val pending = ArrayList<Pair<Long, String>>() // (время, текст)
     private lateinit var scope: CoroutineScope
 
@@ -48,6 +49,7 @@ class PowerHub(private val context: Context, dir: File, private val telegram: Te
     fun close() {
         synchronized(stations) { stations.values.forEach { it.close() } }
         statsStore.flush()
+        outages.save()
     }
 
     private fun launch(c: StationConfig) = synchronized(stations) {
@@ -82,6 +84,12 @@ class PowerHub(private val context: Context, dir: File, private val telegram: Te
         return list()
     }
 
+    /** Журнал отключений, новые сверху. */
+    fun outageList(limit: Int = 200): List<OutageView> {
+        val names = configs.associate { it.id to it.name }
+        return outages.all().take(limit).map { OutageView(names[it.stationId] ?: "удалённая станция", it) }
+    }
+
     suspend fun writeSetting(id: String, key: String, value: Int): Result<StationState> =
         stations[id]?.writeSetting(key, value) ?: Result.failure(IllegalArgumentException("станция не найдена"))
 
@@ -94,7 +102,16 @@ class PowerHub(private val context: Context, dir: File, private val telegram: Te
             val wasOn = watch.gridOn
             val text = watch.update(st)
             // Отключение засчитывается, когда GridWatch подтвердил его (без дребезга)
-            trackers[c.id]?.onState(st, watch.gridOn, outageStarted = wasOn == true && watch.gridOn == false)
+            val on = watch.gridOn
+            trackers[c.id]?.onState(st, on, outageStarted = wasOn == true && on == false)
+            when {
+                wasOn == true && on == false -> outages.start(c.id, watch.changedAtMs ?: st.updatedAtMs, st.socPct)
+                wasOn == false && on == true -> outages.end(c.id, watch.changedAtMs ?: st.updatedAtMs, st.socPct)
+                // Хаб перезапускался: отключение, начатое до перезапуска, продолжается или уже закончилось
+                wasOn == null && on == true -> outages.end(c.id, st.updatedAtMs, st.socPct, approximate = true)
+                wasOn == null && on == false -> outages.start(c.id, st.updatedAtMs, st.socPct, approximate = true)
+            }
+            if (on == false) outages.update(c.id, st)
             if (text == null) continue
             synchronized(pending) { pending += now to (if (multi) "«${c.name}»: " else "") + text }
         }
