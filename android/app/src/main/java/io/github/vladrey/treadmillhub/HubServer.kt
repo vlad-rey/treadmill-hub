@@ -136,6 +136,11 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                 call.respondJson("""{"ok":$ok}""", if (ok) HttpStatusCode.OK else HttpStatusCode.BadRequest)
             }
 
+            post("/api/hub/backup") {
+                hub.markBackup()
+                call.respondJson("""{"ok":true}""")
+            }
+
             get("/api/config") { call.respondJson(json.encodeToString(hub.config.toDto())) }
             post("/api/config") {
                 val result = runCatching { hub.config.apply(json.decodeFromString<ConfigPatch>(call.receiveText())) }

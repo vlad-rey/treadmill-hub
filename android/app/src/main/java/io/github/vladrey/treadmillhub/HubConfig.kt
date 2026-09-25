@@ -28,6 +28,10 @@ class HubConfig(context: Context) {
 
     val port: Int get() = prefs.getInt("port", 8080)
 
+    var lastBackupMs: Long?
+        get() = prefs.getLong("lastBackupMs", 0L).takeIf { it > 0 }
+        set(v) = prefs.edit().putLong("lastBackupMs", v ?: 0L).apply()
+
     fun toDto() = ConfigDto(deviceAddress, backend, weightKg, maxSpeedKmh)
 
     fun apply(dto: ConfigPatch) {

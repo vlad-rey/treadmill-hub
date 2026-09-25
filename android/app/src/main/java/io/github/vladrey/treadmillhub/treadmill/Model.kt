@@ -44,8 +44,18 @@ data class CommandResult(val ok: Boolean, val message: String)
 @Serializable
 data class BleFrame(val ts: Long, val dir: String, val uuid: String, val hex: String)
 
+/** Состояние BLE-связи с дорожкой — для вкладки «Хаб». */
+@Serializable
+data class LinkInfo(
+    val connectedSinceMs: Long? = null,
+    val lastDisconnectMs: Long? = null,
+    val connects: Int = 0,
+    val address: String? = null,
+)
+
 interface TreadmillBackend {
     val name: String
+    val link: LinkInfo get() = LinkInfo()
     val state: StateFlow<TreadmillState>
     val frames: SharedFlow<BleFrame>
     fun start(scope: kotlinx.coroutines.CoroutineScope)

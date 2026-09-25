@@ -21,6 +21,7 @@ import io.github.vladrey.treadmillhub.session.SessionTracker
 import io.github.vladrey.treadmillhub.treadmill.Command
 import io.github.vladrey.treadmillhub.treadmill.CommandResult
 import io.github.vladrey.treadmillhub.treadmill.FtmsBleBackend
+import io.github.vladrey.treadmillhub.treadmill.LinkInfo
 import io.github.vladrey.treadmillhub.treadmill.Limits
 import io.github.vladrey.treadmillhub.treadmill.Phase
 import io.github.vladrey.treadmillhub.treadmill.SimulatorBackend
@@ -46,6 +47,15 @@ data class HubInfo(
     val charging: Boolean?,
     val weightKg: Double,
     val maxSpeedKmh: Double,
+    /** Зарядка подключена (при ограничителе заряда может быть подключена, но не заряжать). */
+    val plugged: Boolean? = null,
+    val memAvailMb: Long? = null,
+    val memTotalMb: Long? = null,
+    val storageFreeMb: Long? = null,
+    val wifiRssi: Int? = null,
+    val link: LinkInfo = LinkInfo(),
+    val sessions: Int = 0,
+    val lastBackupMs: Long? = null,
 )
 
 @Serializable
@@ -237,7 +247,28 @@ class Hub(private val context: Context, val config: HubConfig) {
             charging = status?.let { it == BatteryManager.BATTERY_STATUS_CHARGING },
             weightKg = config.weightKg,
             maxSpeedKmh = config.maxSpeedKmh,
+            plugged = battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)?.takeIf { it >= 0 }?.let { it != 0 },
+            memAvailMb = mem.availMem / 1_048_576,
+            memTotalMb = mem.totalMem / 1_048_576,
+            storageFreeMb = context.filesDir.usableSpace / 1_048_576,
+            wifiRssi = runCatching {
+                @Suppress("DEPRECATION")
+                context.applicationContext.getSystemService(android.net.wifi.WifiManager::class.java).connectionInfo.rssi
+            }.getOrNull()?.takeIf { it > -127 },
+            link = backend.link,
+            sessions = history.list().size,
+            lastBackupMs = config.lastBackupMs,
         )
+    }
+
+    private val mem get() = android.app.ActivityManager.MemoryInfo().also {
+        context.getSystemService(android.app.ActivityManager::class.java).getMemoryInfo(it)
+    }
+
+    /** Отметка от скрипта бэкапа на PC (redmi6-homeserver/tools/backup-hub-data.ps1). */
+    fun markBackup() {
+        config.lastBackupMs = System.currentTimeMillis()
+        _snapshot.value = _snapshot.value.copy(hub = hubInfo())
     }
 }
 

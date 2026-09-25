@@ -69,9 +69,16 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
         manager.close()
     }
 
+    @Volatile override var link = LinkInfo()
+        private set
+
+    /**
+     * Подключение без пауз: попытка ждёт появления дорожки до 30 с, между попытками 2 с.
+     * Дорожку часто обесточивают — после включения в сеть хаб подключается за несколько секунд.
+     */
     private suspend fun connectLoop() {
         val adapter = context.getSystemService(BluetoothManager::class.java).adapter
-        var backoffMs = 2_000L
+        val retryDelayMs = 2_000L
         while (kotlinx.coroutines.currentCoroutineContext().isActive) {
             try {
                 if (!adapter.isEnabled) {
@@ -90,13 +97,14 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
                 manager.connect(adapter.getRemoteDevice(address))
                     .retry(3, 300)
                     .useAutoConnect(false)
-                    .timeout(15_000)
+                    .timeout(30_000)
                     .suspend()
                 Log.i(TAG, "подключено к $address")
+                link = link.copy(connectedSinceMs = System.currentTimeMillis(), connects = link.connects + 1, address = address)
                 _state.update { it.copy(connection = Connection.CONNECTED) }
-                backoffMs = 2_000
-                while (manager.isConnected) delay(1_000)
+                while (manager.isConnected) delay(500)
                 Log.w(TAG, "соединение потеряно")
+                link = link.copy(connectedSinceMs = null, lastDisconnectMs = System.currentTimeMillis())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -104,8 +112,7 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
             }
             _state.update { it.copy(connection = Connection.DISCONNECTED, speedKmh = 0.0) }
             pending.values.forEach { it.cancel() }
-            delay(backoffMs)
-            backoffMs = (backoffMs * 2).coerceAtMost(30_000)
+            delay(retryDelayMs)
         }
     }
 

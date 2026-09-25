@@ -7,6 +7,7 @@ const ACTIVE_PHASES = ["COUNTDOWN", "RUNNING", "PAUSED", "STOPPING"];
 const SPEED_PRESETS = [3, 4, 5, 6, 7, 8, 10, 12, 14, 16];
 
 let toastTimer = 0;
+let lastSnap = null;
 
 // --- Профиль: хранится на хабе, телефон помнит только свой id -------------------------
 let profiles = [];
@@ -109,6 +110,8 @@ function render(snap) {
   renderActions(t, connected);
   keepScreenOn(ACTIVE_PHASES.includes(t.phase));
   if (window.renderProgram) window.renderProgram(snap.program);
+  lastSnap = snap;
+  if (window.renderHub) window.renderHub(snap);
 
   $("bucketRows").innerHTML = (s.buckets || [])
     .filter((b) => b.seconds >= 1)

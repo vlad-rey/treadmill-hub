@@ -17,7 +17,7 @@ header { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; }
 .pill.hr { background: #3b1a24; color: #ff8fab; }
 .muted { color: var(--muted); }
 .icon { background: none; border: 0; color: var(--muted); font-size: 22px; padding: 4px 6px; }
-#fullscreenBtn { margin-left: auto; }
+header .grow { flex: 1; }
 
 .metrics { display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--gap); }
 .metric { grid-column: span 2; background: var(--card); border-radius: 14px; padding: 8px 10px; display: flex; flex-direction: column; min-width: 0; }
@@ -90,6 +90,13 @@ button { font: inherit; color: var(--text); touch-action: manipulation; }
 .step .x { height: 40px; background: none; border: 0; color: var(--muted); font-size: 20px; }
 .wideDlg { width: min(96vw, 560px); }
 
+.tabs { grid-template-columns: repeat(4, 1fr); }
+.warn { background: #3a3117; border: 1px solid #5c4d23; color: #ffe2a3; border-radius: 14px; padding: 10px 12px; }
+.warn.bad { background: #3b1a1c; border-color: #6b2a2d; color: #ffd0d2; }
+.warn.ok { background: #16372a; border-color: #235c3d; color: #7ee2ad; }
+.hubGrid { margin-top: var(--gap); }
+@media (min-width: 900px) { .hubGrid { grid-template-columns: repeat(4, 1fr); } }
+
 .pill.profile { border: 0; color: var(--text); background: #16283a; font-weight: 600; }
 .btn.wide { width: 100%; margin-top: var(--gap); }
 
@@ -115,8 +122,60 @@ dialog { background: var(--card); color: var(--text); border: 1px solid var(--li
 dialog label { display: flex; flex-direction: column; gap: 4px; margin: 12px 0; color: var(--muted); }
 dialog input { font: inherit; font-size: 20px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
 
+/* --- Компьютер / планшет в ландшафте: на всю ширину, крупно, в две колонки --------------- */
+@media (min-width: 900px) {
+  :root { --btn-h: clamp(72px, 9vh, 104px); --action-h: clamp(84px, 10vh, 120px); --gap: 14px; }
+  html, body { font-size: 20px; }
+  body { max-width: none; padding: 16px clamp(16px, 3vw, 48px) calc(var(--action-h) + 40px); }
+  header { gap: 10px; }
+  .pill { font-size: 17px; padding: 6px 14px; }
+  .icon { font-size: 30px; }
+  .tabs { max-width: 900px; margin-left: auto; margin-right: auto; }
+  .tabs button { font-size: 19px; padding: 12px; }
+
+  #tab-workout {
+    display: grid; gap: var(--gap) clamp(20px, 3vw, 48px);
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-areas: "prog pad" "metrics pad" "stats buckets";
+    align-items: start;
+  }
+  #tab-workout.hidden { display: none !important; }
+  #programPanel { grid-area: prog; margin: 0; }
+  #tab-workout .metrics { grid-area: metrics; }
+  #tab-workout .pad { grid-area: pad; }
+  #tab-workout .stats { grid-area: stats; }
+  #tab-workout .buckets { grid-area: buckets; margin-top: 30px; }
+
+  .metric { padding: 14px 18px; border-radius: 18px; }
+  .metric label { font-size: 17px; }
+  .metric b { font-size: clamp(40px, 4.5vw, 72px); }
+  .metric.big b { font-size: clamp(80px, 10vw, 150px); }
+  .metric b small { font-size: 0.4em; }
+  .metric > small { font-size: 16px; }
+  .pad h3, .stats h3, .tab h3 { font-size: 17px; margin-top: 18px; }
+  .btn { font-size: clamp(24px, 2.4vw, 36px); border-radius: 18px; }
+  .chart { height: 120px; }
+  .progTimes { font-size: 15px; }
+  .progTimes b { font-size: 24px; }
+  .progHead b { font-size: 20px; }
+  .stat b { font-size: 30px; }
+  .stat label, .stat small { font-size: 15px; }
+
+  .actionbar { max-width: none; padding-left: clamp(16px, 3vw, 48px); padding-right: clamp(16px, 3vw, 48px); }
+  .action { font-size: 36px; border-radius: 22px; }
+  .countdown { font-size: 280px; }
+  .toast { max-width: 700px; font-size: 20px; }
+
+  #tab-programs, #tab-history, #tab-hub { max-width: 1100px; margin: 0 auto; }
+  .row { min-height: 72px; }
+  .row b { font-size: 21px; }
+  .row small { font-size: 16px; }
+  dialog { width: min(92vw, 640px); font-size: 20px; }
+  .wideDlg { width: min(96vw, 900px); }
+}
+
 /* Невысокие экраны: чуть компактнее, чтобы всё помещалось без прокрутки */
-@media (max-height: 760px) {
+@media (max-height: 760px) and (max-width: 899px) {
   :root { --btn-h: 52px; --action-h: 68px; }
   .metric.big b { font-size: 46px; }
 }
