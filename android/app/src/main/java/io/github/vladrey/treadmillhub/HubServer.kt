@@ -4,6 +4,7 @@ import android.content.res.AssetManager
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.github.vladrey.treadmillhub.gamification.RewardDef
+import io.github.vladrey.treadmillhub.power.StationConfig
 import io.github.vladrey.treadmillhub.program.CustomProgramInput
 import io.github.vladrey.treadmillhub.program.ProgramInfo
 import io.github.vladrey.treadmillhub.session.ConsoleReading
@@ -38,6 +39,9 @@ private data class ProfileRef(val profileId: String? = null)
 @Serializable
 private data class DeliveredInput(val delivered: Boolean = true)
 
+@Serializable
+private data class SettingInput(val key: String, val value: Int)
+
 /** HTTP + WebSocket API хаба и статика веб-интерфейса из assets/web. */
 class HubServer(private val hub: Hub, private val assets: AssetManager, port: Int) {
     private val engine: ApplicationEngine = embeddedServer(CIO, port = port, host = "0.0.0.0") {
@@ -52,6 +56,22 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                 else call.respondAsset(path)
             }
 
+            // Станции Fossibot: состояние, список, настройки
+            get("/power") { call.respondAsset("power/index.html") }
+            get("/power/") { call.respondAsset("power/index.html") }
+            get("/api/power") { call.respondJson(json.encodeToString(hub.power.list())) }
+            post("/api/power/stations") {
+                val r = runCatching { hub.power.setConfigs(json.decodeFromString<List<StationConfig>>(call.receiveText())) }
+                r.fold({ call.respondJson(json.encodeToString(it)) }, { call.respondError(it) })
+            }
+            post("/api/power/{id}/settings") {
+                val body = runCatching { json.decodeFromString<SettingInput>(call.receiveText()) }.getOrNull()
+                if (body == null) { call.respondJson("""{"error":"ожидается {key, value}"}""", HttpStatusCode.BadRequest); return@post }
+                hub.power.writeSetting(call.parameters["id"].orEmpty(), body.key, body.value).fold(
+                    { call.respondJson(json.encodeToString(it)) },
+                    { call.respondError(it) },
+                )
+            }
             get("/api/state") { call.respondJson(json.encodeToString(hub.snapshot.value)) }
 
             post("/api/control") {

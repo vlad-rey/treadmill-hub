@@ -1,0 +1,35 @@
+body.power { padding-bottom: 32px; }
+.pageTitle { font-size: 20px; }
+.navlink { text-decoration: none; color: var(--text); }
+
+.stationGrid { display: grid; gap: 14px; }
+@media (min-width: 900px) { .stationGrid { grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); } }
+
+.station { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
+.station.offgrid { border-color: #6b2a2d; box-shadow: 0 0 22px rgba(229, 72, 77, .25); }
+.stHead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.stHead b { font-size: 20px; margin-right: auto; }
+.soc { display: flex; align-items: baseline; gap: 10px; }
+.soc b { font-size: 52px; font-variant-numeric: tabular-nums; line-height: 1; }
+.soc small { color: var(--muted); }
+.socBar { height: 14px; background: #0d1115; border-radius: 99px; overflow: hidden; margin: 8px 0 12px; }
+.socBar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #2fbf71, #9be15d); }
+.socBar i.low { background: linear-gradient(90deg, #e5484d, #f0b429); }
+.flows { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.flow { background: var(--bg); border-radius: 12px; padding: 8px 10px; }
+.flow label { color: var(--muted); font-size: 12px; display: block; }
+.flow b { font-size: 22px; font-variant-numeric: tabular-nums; }
+
+.setRow { display: grid; grid-template-columns: 120px 1fr; gap: 8px; align-items: center; margin: 8px 0; }
+.setRow > span { color: var(--muted); font-size: 14px; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+.seg .btn { height: 44px; font-size: 15px; }
+.btn.on { border-color: var(--go); color: #7ee2ad; background: #16372a; }
+.station select { font: inherit; font-size: 16px; padding: 9px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); width: 100%; }
+.stFoot { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+.manage { margin-top: 16px; background: var(--card); border-radius: 16px; padding: 12px; }
+.manage summary { color: var(--muted); }
+.stRow { display: grid; grid-template-columns: 1fr 1.3fr 40px; gap: 8px; margin: 8px 0; }
+.stRow input { font: inherit; padding: 9px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); min-width: 0; }
+.stRow .x { background: none; border: 0; color: var(--muted); font-size: 22px; }

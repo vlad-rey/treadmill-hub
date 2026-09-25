@@ -9,6 +9,7 @@ import io.github.vladrey.treadmillhub.gamification.Celebration
 import io.github.vladrey.treadmillhub.gamification.Game
 import io.github.vladrey.treadmillhub.gamification.MetricsCalc
 import io.github.vladrey.treadmillhub.gamification.Telegram
+import io.github.vladrey.treadmillhub.power.PowerHub
 import io.github.vladrey.treadmillhub.program.BuiltinPrograms
 import io.github.vladrey.treadmillhub.program.RunState
 import io.github.vladrey.treadmillhub.program.ProgramRunner
@@ -100,6 +101,8 @@ class Hub(private val context: Context, val config: HubConfig) {
     val history = HistoryStore(File(context.filesDir, "sessions"))
     lateinit var game: Game
         private set
+    val telegram = Telegram({ config.telegramToken }, { config.telegramChatId })
+    val power = PowerHub(context, context.filesDir, telegram)
     private val programsDone = mutableListOf<String>()
     private var lastDoneRunner: ProgramRunner? = null
     private var lastLiveCheckMs = 0L
@@ -117,13 +120,14 @@ class Hub(private val context: Context, val config: HubConfig) {
     val snapshot = _snapshot.asStateFlow()
 
     fun start(scope: CoroutineScope) {
-        game = Game(context.filesDir, history, weights, profiles, Telegram({ config.telegramToken }, { config.telegramChatId }), scope) {
+        game = Game(context.filesDir, history, weights, profiles, telegram, scope) {
             _snapshot.value = _snapshot.value.copy(celebrations = game.store.pending())
         }
         _snapshot.value = _snapshot.value.copy(celebrations = game.store.pending())
         // Ачивки за уже пройденные тренировки (например, после обновления списка ачивок)
         scope.launch { profiles.all().forEach { p -> runCatching { game.evaluate(p.id) } } }
         backend.start(scope)
+        power.start(scope)
         scope.launch {
             backend.state.collect { s ->
                 val now = System.currentTimeMillis()
@@ -162,6 +166,7 @@ class Hub(private val context: Context, val config: HubConfig) {
 
     fun close() {
         if (tracker.current.active) save(tracker.current)
+        power.close()
         backend.close()
     }
 
