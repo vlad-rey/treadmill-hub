@@ -95,6 +95,10 @@ button { font: inherit; color: var(--text); touch-action: manipulation; }
 .warn.bad { background: #3b1a1c; border-color: #6b2a2d; color: #ffd0d2; }
 .warn.ok { background: #16372a; border-color: #235c3d; color: #7ee2ad; }
 .hubGrid { margin-top: var(--gap); }
+dialog select { font: inherit; font-size: 18px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+dialog details { margin: 8px 0; }
+dialog h3 { margin: 14px 2px 4px; font-size: 13px; font-weight: 500; color: var(--muted); }
+.row[data-session] { cursor: pointer; }
 @media (min-width: 900px) { .hubGrid { grid-template-columns: repeat(4, 1fr); } }
 
 .pill.profile { border: 0; color: var(--text); background: #16283a; font-weight: 600; }

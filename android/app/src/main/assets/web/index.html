@@ -138,9 +138,29 @@
         <button type="button" class="btn" id="pdEdit">Изменить</button>
         <button type="button" class="btn" id="pdDelete">Удалить</button>
       </div>
+      <button type="button" class="btn wide" id="pdCopy">Сделать свою на основе этой</button>
       <div class="grid2">
         <button class="btn" value="cancel">Отмена</button>
         <button type="button" class="btn go" id="pdStart">Запустить</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Подробности тренировки -->
+  <dialog id="sessionDlg" class="wideDlg">
+    <form method="dialog">
+      <h2 id="sdTitle"></h2>
+      <div class="statsGrid" id="sdCards"></div>
+      <h3>Скорость и наклон по времени</h3>
+      <svg id="sdChart" class="chart" viewBox="0 0 1000 120" preserveAspectRatio="none"></svg>
+      <details>
+        <summary class="muted">Дистанция по скорости и наклону</summary>
+        <table><thead><tr><th>км/ч</th><th>%</th><th>время</th><th>м</th></tr></thead><tbody id="sdBuckets"></tbody></table>
+      </details>
+      <label>Чья тренировка <select id="sdOwner"></select></label>
+      <div class="grid2">
+        <button type="button" class="btn" id="sdDelete">Удалить</button>
+        <button class="btn go" value="close">Готово</button>
       </div>
     </form>
   </dialog>

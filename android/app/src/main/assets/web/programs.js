@@ -95,6 +95,7 @@ async function openProgram(p) {
   $("pdLevelBox").classList.toggle("hidden", !p.builtin);
   $("pdMinutesBox").classList.toggle("hidden", !p.builtin);
   $("pdCustomActions").classList.toggle("hidden", p.builtin);
+  $("pdCopy").classList.toggle("hidden", !p.builtin);
   $("pdLevels").innerHTML = Array.from({ length: p.levels }, (_, i) => `<button type="button" class="btn" data-level="${i + 1}">${i + 1}</button>`).join("");
   await refreshPreview();
   $("programDlg").showModal();
@@ -230,10 +231,9 @@ $("edSave").onclick = async () => {
 
 // --- История -------------------------------------------------------------------------
 const fmtDate = (ms) => new Date(ms).toLocaleString("ru-RU", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-const sessionRow = (s, claim) => `<div class="row"><span class="grow"><b>${fmtDate(s.id)}</b>
+const sessionRow = (s, claim) => `<div class="row" data-session="${s.id}"><span class="grow"><b>${fmtDate(s.id)}</b>
   <small>${fmtTime(s.movingS)} · ${(s.distanceM / 1000).toFixed(2)} км · ${Math.round(s.kcalCalc)} ккал (дорожка ${s.kcalTreadmill == null ? "—" : Math.round(s.kcalTreadmill)})</small></span>
-  ${claim ? `<button type="button" class="btn" data-claim="${s.id}">Это моя</button>` : ""}
-  <button type="button" class="x" data-del="${s.id}" aria-label="Удалить тренировку">×</button></div>`;
+  ${claim ? `<button type="button" class="btn" data-claim="${s.id}">Это моя</button>` : ""}›</div>`;
 
 async function loadHistory() {
   if (!me) return;
@@ -307,6 +307,85 @@ window.renderHub = function (snap) {
     card("История", `${h.sessions}`, "тренировок сохранено"),
     card("Бэкап на PC", h.lastBackupMs ? ago(h.lastBackupMs) : "не было", h.lastBackupMs ? clock(h.lastBackupMs) : "ежедневно в 23:00"),
   ].join("");
+};
+
+// --- Своя программа на основе встроенной: одинаковые подряд отрезки склеиваются -------------
+$("pdCopy").onclick = () => {
+  const p = pd.program;
+  const steps = [];
+  for (const s of pd.segments) {
+    const last = steps[steps.length - 1];
+    if (last && last.speedKmh === s.speedKmh && last.inclinePct === s.inclinePct) last.durationS += s.durationS;
+    else steps.push({ ...s });
+  }
+  $("programDlg").close();
+  openEditor({ id: null, name: `${p.id} ${p.name} · ур. ${pd.level} (моя)`, blocks: [{ repeat: 1, steps }] });
+};
+
+// --- Подробности тренировки ---------------------------------------------------------------
+let sdSession = null;
+
+document.addEventListener("click", async (e) => {
+  if (e.target.closest("[data-claim]")) return; // «Это моя» обрабатывается отдельно
+  const row = e.target.closest("[data-session]");
+  if (row) openSession(Number(row.dataset.session));
+});
+
+async function openSession(id) {
+  const s = await (await fetch("/api/sessions/" + id)).json();
+  sdSession = s;
+  const st = s.stats, samples = s.samples || [];
+  const moving = samples.filter((x) => x.speedKmh > 0);
+  const maxV = Math.max(0, ...moving.map((x) => x.speedKmh));
+  const maxI = Math.max(0, ...samples.map((x) => x.inclinePct));
+  const avgV = st.movingS > 0 ? (st.distanceM / st.movingS) * 3.6 : 0;
+  $("sdTitle").textContent = fmtDate(s.id);
+  const card = (label, value, sub) => `<div class="stat"><label>${label}</label><b>${value}</b><small>${sub || ""}</small></div>`;
+  $("sdCards").innerHTML = [
+    card("Время", fmtTime(st.movingS), `вес при расчёте ${s.weightKg} кг`),
+    card("Дистанция", (st.distanceM / 1000).toFixed(2) + " км", st.distanceCalcM ? `по скорости ${(st.distanceCalcM / 1000).toFixed(2)} км` : ""),
+    card("Калории", Math.round(st.kcalCalc) + " ккал", `активные ${Math.round(st.kcalActiveCalc)} · дорожка ${st.kcalTreadmill == null ? "—" : Math.round(st.kcalTreadmill)}`),
+    card("Скорость", avgV.toFixed(1) + " км/ч", `средняя · макс ${maxV.toFixed(1)} · наклон до ${Math.round(maxI)} %`),
+  ].join("");
+
+  // График: подряд идущие одинаковые сэмплы склеиваются в отрезки
+  const segs = [];
+  for (let i = 0; i < samples.length; i++) {
+    const cur = samples[i], next = samples[i + 1];
+    const d = next ? Math.max(0, (next.t - cur.t) / 1000) : 1;
+    const last = segs[segs.length - 1];
+    if (last && last.speedKmh === cur.speedKmh && last.inclinePct === cur.inclinePct) last.durationS += d;
+    else segs.push({ durationS: d, speedKmh: cur.speedKmh, inclinePct: cur.inclinePct });
+  }
+  drawChart($("sdChart"), segs, null);
+
+  $("sdBuckets").innerHTML = (st.buckets || [])
+    .filter((b) => b.seconds >= 1)
+    .sort((a, b) => a.speedKmh - b.speedKmh || a.inclinePct - b.inclinePct)
+    .map((b) => `<tr><td>${b.speedKmh.toFixed(1)}</td><td>${b.inclinePct}</td><td>${fmtTime(b.seconds)}</td><td>${Math.round(b.meters)}</td></tr>`)
+    .join("");
+
+  $("sdOwner").innerHTML = profiles.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("") +
+    `<option value="">Без владельца (запуск с пульта)</option>`;
+  $("sdOwner").value = s.profileId || "";
+  $("sessionDlg").showModal();
+}
+
+$("sdOwner").onchange = async () => {
+  const profileId = $("sdOwner").value || null;
+  await fetch(`/api/sessions/${sdSession.id}/profile`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ profileId }),
+  });
+  loadHistory();
+  loadStats();
+};
+
+$("sdDelete").onclick = async () => {
+  if (!confirm("Удалить эту тренировку из истории? Отменить нельзя.")) return;
+  await fetch("/api/sessions/" + sdSession.id, { method: "DELETE" });
+  $("sessionDlg").close();
+  loadHistory();
+  loadStats();
 };
 
 window.onProfileChanged = () => {
