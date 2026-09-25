@@ -36,9 +36,11 @@ class HubService : Service() {
 
         wakeLock = getSystemService(PowerManager::class.java)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "treadmillhub:hub").apply { acquire() }
+        // Wi-Fi не выключается при погасшем экране, но энергосбережение Wi-Fi разрешено:
+        // HIGH_PERF давал заметный лишний расход, а задержка PS-режима (0,1–0,3 с) для 1 Гц незаметна
         @Suppress("DEPRECATION")
         wifiLock = applicationContext.getSystemService(WifiManager::class.java)
-            .createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "treadmillhub:wifi").apply { acquire() }
+            .createWifiLock(WifiManager.WIFI_MODE_FULL, "treadmillhub:wifi").apply { acquire() }
 
         val config = HubConfig(this)
         val h = Hub(this, config).also { it.start(scope) }
