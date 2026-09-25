@@ -32,6 +32,11 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
+    // Таблицы встроенных программ — единый источник в protocol/programs
+    sourceSets {
+        getByName("main") { assets.srcDir("../../protocol/programs") }
+    }
+
     packaging {
         resources {
             excludes += setOf("META-INF/INDEX.LIST", "META-INF/DEPENDENCIES", "META-INF/io.netty.versions.properties")

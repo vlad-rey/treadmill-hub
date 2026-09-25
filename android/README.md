@@ -26,6 +26,13 @@ powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 | POST | `/api/control` | `{"action": "start\|stop\|pause\|speed\|incline\|speedDelta\|inclineDelta", "value": 5.0}` |
 | GET/POST | `/api/config` | `deviceAddress`, `backend` (`ftms`/`sim`), `weightKg`, `maxSpeedKmh` (по умолчанию 12) |
 | WS | `/ws/debug/ble` | сырые BLE-пакеты в hex (для агентов) |
+| GET/POST | `/api/profiles`, `/api/profiles/{id}` | профили: имя, вес, лимит скорости |
+| GET | `/api/stats?profile=ID` | итоги: сегодня / неделя / месяц / всё время |
+| GET | `/api/sessions?profile=ID`, `/api/sessions/{id}` | история (пустой `profile=` — без владельца) |
+| POST | `/api/sessions/{id}/profile`, `/api/sessions/{id}/console` | переназначить владельца; показания пульта для сверки |
+| GET | `/api/programs?profile=ID` | встроенные P1–P8 + свои (общие и профиля) |
+| GET | `/api/programs/{id}/segments?level=&minutes=&profile=` | отрезки для предпросмотра (скорость ≤ лимита профиля) |
+| POST/DELETE | `/api/programs`, `/api/programs/{id}` | свои программы: `{name, profileId, blocks:[{repeat, steps:[{durationS, speedKmh, inclinePct?}]}]}` |
 
 Лимиты проверяются на хабе: скорость 1–min(лимит, 16) км/ч, наклон 0–15 %. `stop` не ждёт в очереди за другими командами.
 

@@ -5,6 +5,12 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.SystemClock
+import io.github.vladrey.treadmillhub.program.BuiltinPrograms
+import io.github.vladrey.treadmillhub.program.ProgramRunner
+import io.github.vladrey.treadmillhub.program.ProgramStatus
+import io.github.vladrey.treadmillhub.program.ProgramStore
+import io.github.vladrey.treadmillhub.program.Segment
+import io.github.vladrey.treadmillhub.program.capSpeed
 import io.github.vladrey.treadmillhub.session.HistoryStore
 import io.github.vladrey.treadmillhub.session.ProfileStore
 import io.github.vladrey.treadmillhub.session.StatsCalculator
@@ -50,10 +56,18 @@ data class Snapshot(
     /** Чья сейчас тренировка (тот, кто нажал СТАРТ); null — запуск с пульта. */
     val ownerProfileId: String? = null,
     val ownerName: String? = null,
+    val program: ProgramStatus? = null,
 )
 
 @Serializable
-data class ControlRequest(val action: String, val value: Double? = null, val profileId: String? = null)
+data class ControlRequest(
+    val action: String,
+    val value: Double? = null,
+    val profileId: String? = null,
+    val programId: String? = null,
+    val level: Int? = null,
+    val minutes: Int? = null,
+)
 
 /** Связывает дорожку, учёт тренировки и API. Живёт внутри HubService. */
 class Hub(private val context: Context, val config: HubConfig) {
@@ -61,6 +75,9 @@ class Hub(private val context: Context, val config: HubConfig) {
         if (config.backend == "sim") SimulatorBackend { Limits.MAX_SPEED_KMH } else FtmsBleBackend(context, config)
 
     val profiles = ProfileStore(File(context.filesDir, "profiles.json"))
+    val builtin = BuiltinPrograms(context.assets.open("programs-t12b.json").bufferedReader().use { it.readText() })
+    val programs = ProgramStore(File(context.filesDir, "programs.json"))
+    @Volatile private var runner: ProgramRunner? = null
     val history = HistoryStore(File(context.filesDir, "sessions"))
 
     /** Кто нажал СТАРТ — станет владельцем следующей тренировки. */
@@ -94,6 +111,18 @@ class Hub(private val context: Context, val config: HubConfig) {
                 delay(10_000)
             }
         }
+        // Программа: раз в секунду сверяемся с дорожкой и отправляем команды нового отрезка
+        scope.launch {
+            while (isActive) {
+                delay(1_000)
+                val r = runner ?: continue
+                for (cmd in r.tick(backend.state.value.phase, 1.0)) {
+                    val res = backend.command(cmd)
+                    if (!res.ok) android.util.Log.w("Hub", "программа: $cmd — ${res.message}")
+                }
+                _snapshot.value = _snapshot.value.copy(program = r.status())
+            }
+        }
     }
 
     fun close() {
@@ -116,6 +145,11 @@ class Hub(private val context: Context, val config: HubConfig) {
             if (now - lastSaveMs >= 60_000) { save(session); lastSaveMs = now }
         } else if (wasActive) {
             save(session)
+            // Тренировка закрыта — убираем завершённую программу с экрана
+            if (runner?.finished == true) {
+                runner = null
+                _snapshot.value = _snapshot.value.copy(program = null)
+            }
         }
     }
 
@@ -133,9 +167,20 @@ class Hub(private val context: Context, val config: HubConfig) {
         val cmd = when (req.action) {
             "start" -> {
                 if (!tracker.current.active) nextOwner = req.profileId
+                if (runner?.finished == true) { runner = null; _snapshot.value = _snapshot.value.copy(program = null) }
                 Command.Start
             }
-            "stop" -> Command.Stop
+            "program" -> return startProgram(req, maxSpeed)
+            "programEnd" -> {
+                // Программа прекращается, лента продолжает ехать в ручном режиме
+                runner?.cancel()
+                runner?.let { _snapshot.value = _snapshot.value.copy(program = it.status()) }
+                return CommandResult(true, "программа завершена, ручной режим")
+            }
+            "stop" -> {
+                runner?.cancel()
+                Command.Stop
+            }
             "pause" -> Command.Pause
             "speed" -> Command.Speed(req.value ?: return bad("нужно value"))
             "incline" -> Command.Incline(req.value ?: return bad("нужно value"))
@@ -156,6 +201,25 @@ class Hub(private val context: Context, val config: HubConfig) {
     }
 
     private fun bad(msg: String) = CommandResult(false, msg)
+
+    /** Отрезки программы (встроенной — по уровню и длительности) со скоростью в пределах лимита. */
+    fun programSegments(id: String, level: Int?, minutes: Int?, maxSpeed: Double): List<Segment>? =
+        (builtin.segments(id, level ?: 1, minutes ?: builtin.defaultMinutes) ?: programs.get(id)?.segments())?.capSpeed(maxSpeed)
+
+    private suspend fun startProgram(req: ControlRequest, maxSpeed: Double): CommandResult {
+        val id = req.programId ?: return bad("нужен programId")
+        val phase = backend.state.value.phase
+        if (phase != Phase.IDLE && phase != Phase.FINISHED) return bad("программу можно запустить, когда лента стоит")
+        val segments = programSegments(id, req.level, req.minutes, maxSpeed) ?: return bad("программа не найдена")
+        val name = builtin.get(id)?.let { "${it.id} ${it.name} · ур. ${req.level ?: 1}" } ?: programs.get(id)?.name ?: id
+        if (!tracker.current.active) nextOwner = req.profileId
+        val r = ProgramRunner(id, name, segments)
+        runner = r
+        _snapshot.value = _snapshot.value.copy(program = r.status())
+        val res = backend.command(Command.Start)
+        if (!res.ok) { runner = null; _snapshot.value = _snapshot.value.copy(program = null) }
+        return res
+    }
 
     private fun hubInfo(): HubInfo {
         val battery = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))

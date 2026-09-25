@@ -3,7 +3,10 @@ package io.github.vladrey.treadmillhub
 import android.content.res.AssetManager
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.github.vladrey.treadmillhub.program.CustomProgramInput
+import io.github.vladrey.treadmillhub.program.ProgramInfo
 import io.github.vladrey.treadmillhub.session.ConsoleReading
+import io.ktor.server.routing.delete
 import io.github.vladrey.treadmillhub.session.ProfilePatch
 import kotlinx.serialization.Serializable
 import io.ktor.server.application.call
@@ -68,6 +71,40 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                     { call.respondError(it) },
                 )
             }
+            // Программы: встроенные P1–P8 и свои (свои — общие и профиля)
+            get("/api/programs") {
+                val profile = call.request.queryParameters["profile"]
+                val builtins = hub.builtin.all.map { ProgramInfo(it.id, it.name, true, it.levels.size, null) }
+                val custom = hub.programs.all().filter { it.profileId == null || it.profileId == profile }
+                    .map { ProgramInfo(it.id, it.name, false, 0, it.segments().sumOf { s -> s.durationS }, it.profileId) }
+                call.respondJson(json.encodeToString(builtins + custom))
+            }
+            get("/api/programs/{id}") {
+                val p = hub.programs.get(call.parameters["id"].orEmpty())
+                if (p == null) call.respondJson("""{"error":"не найдено"}""", HttpStatusCode.NotFound) else call.respondJson(json.encodeToString(p))
+            }
+            get("/api/programs/{id}/segments") {
+                val q = call.request.queryParameters
+                val max = hub.profiles.get(q["profile"])?.maxSpeedKmh ?: hub.config.maxSpeedKmh
+                val segs = hub.programSegments(call.parameters["id"].orEmpty(), q["level"]?.toIntOrNull(), q["minutes"]?.toIntOrNull(), max)
+                if (segs == null) call.respondJson("""{"error":"не найдено"}""", HttpStatusCode.NotFound) else call.respondJson(json.encodeToString(segs))
+            }
+            post("/api/programs") {
+                val r = runCatching { hub.programs.create(json.decodeFromString<CustomProgramInput>(call.receiveText())) }
+                r.fold({ call.respondJson(json.encodeToString(it)) }, { call.respondError(it) })
+            }
+            post("/api/programs/{id}") {
+                val r = runCatching { hub.programs.update(call.parameters["id"].orEmpty(), json.decodeFromString<CustomProgramInput>(call.receiveText())) }
+                r.fold(
+                    { if (it == null) call.respondJson("""{"error":"не найдено"}""", HttpStatusCode.NotFound) else call.respondJson(json.encodeToString(it)) },
+                    { call.respondError(it) },
+                )
+            }
+            delete("/api/programs/{id}") {
+                val ok = hub.programs.delete(call.parameters["id"].orEmpty())
+                call.respondJson("""{"ok":$ok}""", if (ok) HttpStatusCode.OK else HttpStatusCode.NotFound)
+            }
+
             // Итоги: сегодня / неделя / месяц / всё время. profile пустой — тренировки без владельца
             get("/api/stats") { call.respondJson(json.encodeToString(hub.stats(call.request.queryParameters["profile"]?.ifBlank { null }))) }
 

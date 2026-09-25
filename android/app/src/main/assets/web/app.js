@@ -22,6 +22,7 @@ async function loadProfiles() {
   $("profileBtn").textContent = me ? me.name : "кто вы?";
   presetsFor = null;
   if (!me) openProfileDialog(); else loadStats();
+  if (window.onProfileChanged) window.onProfileChanged();
 }
 
 function openProfileDialog() {
@@ -81,7 +82,7 @@ function render(snap) {
   $("phase").textContent = (PHASES[t.phase] || t.phase) + (others ? " · " + snap.ownerName : "");
 
   // Тренировка закончилась — обновить итоги
-  if (wasActive && !s.active) loadStats();
+  if (wasActive && !s.active) { loadStats(); if (window.loadHistory) window.loadHistory(); }
   wasActive = s.active;
   $("hr").classList.toggle("hidden", !t.heartRate);
   $("hr").textContent = "♥ " + (t.heartRate || "");
@@ -107,6 +108,7 @@ function render(snap) {
   });
   renderActions(t, connected);
   keepScreenOn(ACTIVE_PHASES.includes(t.phase));
+  if (window.renderProgram) window.renderProgram(snap.program);
 
   $("bucketRows").innerHTML = (s.buckets || [])
     .filter((b) => b.seconds >= 1)
@@ -189,24 +191,27 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.add("hidden"), 3500);
 }
 
-async function control(action, value) {
+async function control(action, value, extra = {}) {
   // Тренировка записывается на того, кто нажал СТАРТ — без профиля не начинаем
-  if (action === "start" && !me) { openProfileDialog(); return; }
+  if ((action === "start" || action === "program") && !me) { openProfileDialog(); return false; }
   try {
     const r = await fetch("/api/control", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, value, profileId: me ? me.id : null }),
+      body: JSON.stringify({ action, value, profileId: me ? me.id : null, ...extra }),
     });
     const body = await r.json();
     if (!body.ok) toast(body.message);
+    return body.ok;
   } catch (e) {
     toast("хаб недоступен");
+    return false;
   }
 }
 
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-act]");
+  if (b && b.closest("dialog")) return; // кнопки в диалогах обрабатываются отдельно
   if (!b || b.disabled) return;
   if (b.id === "mainBtn" && Date.now() < mainLockedUntil) return;
   enterFullscreen(); // первое же нажатие убирает адресную строку

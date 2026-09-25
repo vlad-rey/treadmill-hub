@@ -20,42 +20,82 @@
     <button id="settingsBtn" class="icon" aria-label="Настройки">⚙</button>
   </header>
 
+  <nav class="tabs">
+    <button data-tab="workout" class="active">Тренировка</button>
+    <button data-tab="programs">Программы</button>
+    <button data-tab="history">История</button>
+  </nav>
+
   <main>
-    <section class="metrics">
-      <div class="metric big"><label>Скорость, км/ч</label><b id="speed">0.0</b></div>
-      <div class="metric big"><label>Наклон</label><b id="incline">0<small>%</small></b><small id="inclineDeg">0.0°</small></div>
-      <div class="metric"><label>Время</label><b id="time">0:00</b></div>
-      <div class="metric"><label>Дистанция, км</label><b id="distance">0.00</b></div>
-      <div class="metric"><label>Ккал</label><b id="kcalCalc">0</b><small id="kcalTm">дорожка —</small></div>
+    <!-- ТРЕНИРОВКА -->
+    <section id="tab-workout" class="tab">
+      <section id="programPanel" class="program hidden">
+        <div class="progHead">
+          <b id="progName"></b>
+          <button id="progEnd" class="link">завершить программу</button>
+        </div>
+        <svg id="progChart" class="chart" viewBox="0 0 1000 120" preserveAspectRatio="none"></svg>
+        <div class="progTimes">
+          <span>отрезок <b id="progSeg"></b></span>
+          <span>осталось <b id="progSegLeft"></b></span>
+          <span>до конца <b id="progLeft"></b></span>
+          <span>дальше <b id="progNext"></b></span>
+        </div>
+      </section>
+
+      <section class="metrics">
+        <div class="metric big"><label>Скорость, км/ч</label><b id="speed">0.0</b></div>
+        <div class="metric big"><label>Наклон</label><b id="incline">0<small>%</small></b><small id="inclineDeg">0.0°</small></div>
+        <div class="metric"><label>Время</label><b id="time">0:00</b></div>
+        <div class="metric"><label>Дистанция, км</label><b id="distance">0.00</b></div>
+        <div class="metric"><label>Ккал</label><b id="kcalCalc">0</b><small id="kcalTm">дорожка —</small></div>
+      </section>
+
+      <section class="pad">
+        <h3>Скорость, км/ч</h3>
+        <div class="grid4">
+          <button class="btn" data-act="speedDelta" data-v="-1">−1</button>
+          <button class="btn" data-act="speedDelta" data-v="-0.1">−0.1</button>
+          <button class="btn" data-act="speedDelta" data-v="0.1">+0.1</button>
+          <button class="btn" data-act="speedDelta" data-v="1">+1</button>
+        </div>
+        <div class="grid4" id="speedPresets"></div>
+        <h3>Наклон, %</h3>
+        <div class="grid4">
+          <button class="btn" data-act="incline" data-v="0">0</button>
+          <button class="btn" data-act="incline" data-v="5">5</button>
+          <button class="btn" data-act="incline" data-v="10">10</button>
+          <button class="btn" data-act="incline" data-v="15">15</button>
+        </div>
+      </section>
+
+      <section class="stats">
+        <h3>Мои итоги</h3>
+        <div class="statsGrid" id="stats"></div>
+      </section>
+
+      <details class="buckets">
+        <summary>Дистанция по скорости и наклону</summary>
+        <table><thead><tr><th>км/ч</th><th>%</th><th>время</th><th>м</th></tr></thead><tbody id="bucketRows"></tbody></table>
+      </details>
     </section>
 
-    <section class="pad">
-      <h3>Скорость, км/ч</h3>
-      <div class="grid4">
-        <button class="btn" data-act="speedDelta" data-v="-1">−1</button>
-        <button class="btn" data-act="speedDelta" data-v="-0.1">−0.1</button>
-        <button class="btn" data-act="speedDelta" data-v="0.1">+0.1</button>
-        <button class="btn" data-act="speedDelta" data-v="1">+1</button>
-      </div>
-      <div class="grid4" id="speedPresets"></div>
-      <h3>Наклон, %</h3>
-      <div class="grid4" id="inclinePresets">
-        <button class="btn" data-act="incline" data-v="0">0</button>
-        <button class="btn" data-act="incline" data-v="5">5</button>
-        <button class="btn" data-act="incline" data-v="10">10</button>
-        <button class="btn" data-act="incline" data-v="15">15</button>
-      </div>
+    <!-- ПРОГРАММЫ -->
+    <section id="tab-programs" class="tab hidden">
+      <h3>Встроенные программы дорожки</h3>
+      <div id="builtinList" class="list"></div>
+      <h3>Мои программы</h3>
+      <div id="customList" class="list"></div>
+      <button id="newProgram" class="btn wide">+ Новая программа</button>
     </section>
 
-    <section class="stats">
-      <h3>Мои итоги</h3>
-      <div class="statsGrid" id="stats"></div>
+    <!-- ИСТОРИЯ -->
+    <section id="tab-history" class="tab hidden">
+      <h3>Мои тренировки</h3>
+      <div id="historyList" class="list"></div>
+      <h3 id="orphansTitle" class="hidden">Без владельца (запуск с пульта)</h3>
+      <div id="orphanList" class="list"></div>
     </section>
-
-    <details class="buckets">
-      <summary>Дистанция по скорости и наклону</summary>
-      <table><thead><tr><th>км/ч</th><th>%</th><th>время</th><th>м</th></tr></thead><tbody id="bucketRows"></tbody></table>
-    </details>
   </main>
 
   <!-- СТАРТ, пока лента стоит; ПАУЗА | СТОП (50/50), пока запущена -->
@@ -66,6 +106,52 @@
 
   <div id="countdown" class="countdown hidden"></div>
   <div id="toast" class="toast hidden"></div>
+
+  <!-- Запуск программы: уровень, длительность, профиль -->
+  <dialog id="programDlg">
+    <form method="dialog">
+      <h2 id="pdName"></h2>
+      <div id="pdLevelBox">
+        <h3>Уровень</h3>
+        <div class="grid4" id="pdLevels"></div>
+      </div>
+      <div id="pdMinutesBox">
+        <h3>Длительность, мин</h3>
+        <div class="grid4">
+          <button type="button" class="btn" data-min="-5">−5</button>
+          <b class="btn value" id="pdMinutes">30</b>
+          <button type="button" class="btn" data-min="5">+5</button>
+          <button type="button" class="btn" data-min="10">+10</button>
+        </div>
+      </div>
+      <svg id="pdChart" class="chart" viewBox="0 0 1000 120" preserveAspectRatio="none"></svg>
+      <p class="muted" id="pdSummary"></p>
+      <div class="grid2" id="pdCustomActions">
+        <button type="button" class="btn" id="pdEdit">Изменить</button>
+        <button type="button" class="btn" id="pdDelete">Удалить</button>
+      </div>
+      <div class="grid2">
+        <button class="btn" value="cancel">Отмена</button>
+        <button type="button" class="btn go" id="pdStart">Запустить</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Редактор своей программы -->
+  <dialog id="editorDlg" class="wideDlg">
+    <form method="dialog">
+      <h2>Своя программа</h2>
+      <label>Название <input id="edName" maxlength="40" autocomplete="off"></label>
+      <div id="edBlocks"></div>
+      <button type="button" class="btn wide" id="edAddBlock">+ Блок</button>
+      <svg id="edChart" class="chart" viewBox="0 0 1000 120" preserveAspectRatio="none"></svg>
+      <p class="muted" id="edSummary"></p>
+      <div class="grid2">
+        <button class="btn" value="cancel">Отмена</button>
+        <button type="button" class="btn go" id="edSave">Сохранить</button>
+      </div>
+    </form>
+  </dialog>
 
   <dialog id="settings">
     <form method="dialog">
@@ -95,5 +181,6 @@
   </dialog>
 
   <script src="/static/app.js"></script>
+  <script src="/static/programs.js"></script>
 </body>
 </html>
