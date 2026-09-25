@@ -124,8 +124,8 @@ let presetsFor = null;
 function renderPresets(max) {
   if (presetsFor === max) return;
   presetsFor = max;
-  // Ровно 8 кнопок (2 ряда по 4): самые ходовые скорости в пределах лимита
-  const values = SPEED_PRESETS.filter((v) => v <= max).slice(0, 8);
+  // Один ряд из 4 кнопок: самые ходовые скорости в пределах лимита
+  const values = SPEED_PRESETS.filter((v) => v <= max).slice(0, 4);
   $("speedPresets").innerHTML = values.map((v) => `<button class="btn" data-act="speed" data-v="${v}">${v}</button>`).join("");
 }
 
