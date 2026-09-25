@@ -41,8 +41,10 @@ data class SessionStats(
     val active: Boolean = false,
     val startedAtMs: Long? = null,
     val movingS: Double = 0.0,
-    /** Дистанция, посчитанная хабом по скорости (FTMS на T12B отдаёт 0). */
+    /** Дистанция: по счётчику дорожки, если он есть (совпадает с пультом), иначе по скорости. */
     val distanceM: Double = 0.0,
+    /** Дистанция, посчитанная хабом по скорости — для сравнения (на разгонах завышает ~5 %). */
+    val distanceCalcM: Double = 0.0,
     val kcalCalc: Double = 0.0,
     val kcalActiveCalc: Double = 0.0,
     val kcalTreadmill: Double? = null,
@@ -51,8 +53,9 @@ data class SessionStats(
 )
 
 /**
- * Считает тренировку по сэмплам телеметрии (~1 Гц). Интегрирует по предыдущему сэмплу,
- * поэтому смена скорости/наклона учитывается с точностью до секунды.
+ * Считает тренировку по сэмплам телеметрии (~1 Гц). Время и калории — по предыдущему сэмплу,
+ * поэтому смена скорости/наклона учитывается с точностью до секунды. Дистанция — приростом
+ * счётчика дорожки (он обнуляется после СТОП — это учтено); если счётчика нет — по скорости.
  */
 class SessionTracker(private val weightKg: () -> Double) {
     private var stats = SessionStats()
@@ -60,6 +63,9 @@ class SessionTracker(private val weightKg: () -> Double) {
     private var lastSpeed = 0.0
     private var lastIncline = 0.0
     private var idleSinceMs: Long? = null
+    private var lastTmDist: Int? = null
+    private var tmSeen = false
+    private var tmDistM = 0.0
     private val buckets = LinkedHashMap<Pair<Int, Int>, DoubleArray>() // (скорость×10, наклон) → [сек, м]
 
     val current: SessionStats get() = stats
@@ -71,26 +77,55 @@ class SessionTracker(private val weightKg: () -> Double) {
             buckets.clear()
             stats = SessionStats(active = true, startedAtMs = nowMs)
             lastMs = nowMs
+            lastTmDist = s.distanceM
+            tmSeen = false
+            tmDistM = 0.0
+            lastTmKcal = s.kcal
+            tmKcal = 0.0
         }
 
         if (stats.active) {
+            val key = (lastSpeed * 10).roundToInt() to lastIncline.roundToInt()
             val dt = ((nowMs - lastMs) / 1000.0).coerceIn(0.0, 5.0) // разрыв связи не накручивает время
             if (dt > 0 && lastSpeed > 0) {
                 val meters = lastSpeed / 3.6 * dt
                 val w = weightKg()
-                val key = (lastSpeed * 10).roundToInt() to lastIncline.roundToInt()
                 val acc = buckets.getOrPut(key) { DoubleArray(2) }
                 acc[0] += dt
-                acc[1] += meters
+                if (!tmSeen) acc[1] += meters
                 stats = stats.copy(
                     movingS = stats.movingS + dt,
-                    distanceM = stats.distanceM + meters,
+                    distanceCalcM = stats.distanceCalcM + meters,
                     kcalCalc = stats.kcalCalc + Calories.kcalPerMinute(lastSpeed, lastIncline, w) * dt / 60,
                     kcalActiveCalc = stats.kcalActiveCalc + Calories.activeKcalPerMinute(lastSpeed, lastIncline, w) * dt / 60,
                 )
             }
+
+            // Счётчик дорожки: FTMS на T12B отдаёт вечный 0 — считаем счётчик настоящим, когда он хоть раз > 0
+            val d = s.distanceM
+            if (d != null && (d > 0 || tmSeen)) {
+                val prev = lastTmDist
+                val delta = when {
+                    prev == null -> 0
+                    d >= prev -> d - prev
+                    d < 20 -> d // дорожку остановили и запустили заново — счёт с нуля
+                    else -> 0
+                }
+                if (!tmSeen && delta >= 0) {
+                    // Переход с расчёта на счётчик: всё, что было по расчёту, заменяем счётчиком
+                    buckets.values.forEach { it[1] = 0.0 }
+                    tmSeen = true
+                }
+                if (delta > 0) {
+                    tmDistM += delta
+                    buckets.getOrPut(key) { DoubleArray(2) }[1] += delta.toDouble()
+                }
+                lastTmDist = d
+            }
+
             stats = stats.copy(
-                kcalTreadmill = s.kcal ?: stats.kcalTreadmill,
+                distanceM = if (tmSeen) tmDistM else stats.distanceCalcM,
+                kcalTreadmill = trackTreadmillKcal(s.kcal),
                 buckets = buckets.map { (k, v) -> Bucket(k.first / 10.0, k.second.toDouble(), v[0], v[1]) },
             )
 
@@ -107,5 +142,22 @@ class SessionTracker(private val weightKg: () -> Double) {
         lastSpeed = s.speedKmh
         lastIncline = s.inclinePct
         return stats
+    }
+
+    private var lastTmKcal: Double? = null
+    private var tmKcal = 0.0
+
+    /** Калории дорожки копятся за заезд и обнуляются после СТОП — суммируем приросты. */
+    private fun trackTreadmillKcal(k: Double?): Double? {
+        if (k == null) return stats.kcalTreadmill
+        val prev = lastTmKcal
+        tmKcal += when {
+            prev == null -> k
+            k >= prev -> k - prev
+            k < 1.0 -> k   // обнуление после СТОП и новый заезд
+            else -> 0.0    // смена источника (FitShow 57,2 → FTMS 57) — не обнуление
+        }
+        lastTmKcal = k
+        return tmKcal
     }
 }

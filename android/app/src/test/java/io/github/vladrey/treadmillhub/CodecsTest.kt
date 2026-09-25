@@ -71,6 +71,16 @@ class CodecsTest {
         assertEquals(1.7, s.kcal!!, 1e-9)
     }
 
+    @Test fun fitShowPausedAndDistance() {
+        // пауза во время теста 2026-09-25: 9:27, 720 м, 54,1 ккал
+        val s = FitShow.parseStatus(hex("02 51 0a 00 0a 37 02 d0 02 1d 02 23 00 00 00 8a 03"))!!
+        assertEquals(FitShow.STATE_PAUSED, s.state)
+        assertEquals(567, s.elapsedS)
+        assertEquals(720, s.distanceM)
+        assertEquals(54.1, s.kcal!!, 1e-9)
+        assertEquals(10.0, s.inclinePct!!, 1e-9)
+    }
+
     @Test fun fitShowBadChecksum() {
         assertNull(FitShow.parseStatus(hex("02 51 00 52 03")))
     }

@@ -58,6 +58,7 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
     @Volatile private var kcalFtms: Double? = null
     @Volatile private var kcalFitShow: Double? = null
     private val kcal get() = kcalFitShow ?: kcalFtms
+    @Volatile private var distFitShow: Int? = null
 
     override fun start(scope: CoroutineScope) {
         job = scope.launch { connectLoop() }
@@ -198,7 +199,8 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
             s.copy(
                 speedKmh = d.speedKmh ?: s.speedKmh,
                 inclinePct = d.inclinePct ?: s.inclinePct,
-                distanceM = d.distanceM ?: s.distanceM,
+                // FTMS Total Distance на T12B всегда 0 — счётчик дорожки приходит в FitShow
+                distanceM = distFitShow ?: d.distanceM ?: s.distanceM,
                 elapsedS = d.elapsedS ?: s.elapsedS,
                 heartRate = if (d.speedKmh != null) d.heartRate else s.heartRate,
                 kcal = kcal,
@@ -210,20 +212,23 @@ class FtmsBleBackend(private val context: Context, private val config: HubConfig
     private fun onFitShow(b: ByteArray) {
         emit("rx", FitShow.NOTIFY, b)
         val st = FitShow.parseStatus(b) ?: return
-        // Точные калории (шаг 0,1) есть только в движении/после стопа; в ожидании — берём FTMS
-        if (st.kcal != null) kcalFitShow = st.kcal else if (st.state == 0x00) kcalFitShow = null
+        // Точные калории и дистанция есть только в движении/паузе/после стопа; в ожидании — сброс
+        if (st.kcal != null) kcalFitShow = st.kcal else if (st.state == FitShow.STATE_IDLE) kcalFitShow = null
+        if (st.distanceM != null) distFitShow = st.distanceM else if (st.state == FitShow.STATE_IDLE) distFitShow = null
         _state.update { s ->
             val phase = when (st.state) {
-                0x00 -> Phase.IDLE
-                0x02 -> Phase.COUNTDOWN
-                0x03 -> Phase.RUNNING
-                0x04 -> if ((st.speedKmh ?: s.speedKmh) > 0) Phase.STOPPING else Phase.FINISHED
+                FitShow.STATE_IDLE -> Phase.IDLE
+                FitShow.STATE_COUNTDOWN -> Phase.COUNTDOWN
+                FitShow.STATE_RUNNING -> Phase.RUNNING
+                FitShow.STATE_STOPPING -> if ((st.speedKmh ?: s.speedKmh) > 0) Phase.STOPPING else Phase.FINISHED
+                FitShow.STATE_PAUSED -> Phase.PAUSED
                 else -> s.phase
             }
             s.copy(
                 phase = phase,
                 countdown = st.countdown,
                 kcal = kcal,
+                distanceM = distFitShow ?: s.distanceM,
                 vendorRaw = st.unknown ?: if (phase == Phase.IDLE) null else s.vendorRaw,
             )
         }

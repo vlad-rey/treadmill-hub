@@ -113,26 +113,35 @@ object FitShow {
         val speedKmh: Double? = null,
         val inclinePct: Double? = null,
         val elapsedS: Int? = null,
-        /** Гипотеза: поле в десятых долях ккал (сошлось с FTMS на 1 ккал). */
+        /** Калории в десятых долях ккал — сверено с пультом (15,7 → «15»). */
         val kcal: Double? = null,
-        /** Поля, смысл которых ещё не ясен (смещения 6, 10, 12) — пишутся в историю для сверки с пультом. */
+        /** Дистанция дорожки, м (шаг 10 м) — сверено с пультом (750 м → «0.7»). */
+        val distanceM: Int? = null,
+        /** Поля, смысл которых ещё не ясен (смещения 10, 12). */
         val unknown: List<Int>? = null,
     )
 
-    /** Кадр статуса 0x51: 00 ожидание, 02 отсчёт, 03 движение, 04 торможение/после стопа. */
+    const val STATE_IDLE = 0x00
+    const val STATE_COUNTDOWN = 0x02
+    const val STATE_RUNNING = 0x03
+    const val STATE_STOPPING = 0x04
+    const val STATE_PAUSED = 0x0a
+
+    /** Кадр статуса 0x51: 00 ожидание, 02 отсчёт, 03 движение, 04 торможение/после стопа, 0a пауза. */
     fun parseStatus(b: ByteArray): Status? {
         val p = unwrap(b) ?: return null
         if (p.isEmpty() || u8(p, 0) != 0x51) return null
         val state = if (p.size > 1) u8(p, 1) else 0
         return when {
-            state == 0x02 && p.size >= 3 -> Status(state, countdown = u8(p, 2))
-            (state == 0x03 || state == 0x04) && p.size >= 12 -> Status(
+            state == STATE_COUNTDOWN && p.size >= 3 -> Status(state, countdown = u8(p, 2))
+            state in listOf(STATE_RUNNING, STATE_STOPPING, STATE_PAUSED) && p.size >= 12 -> Status(
                 state,
                 speedKmh = u8(p, 2) / 10.0,
                 inclinePct = u8(p, 3).toDouble(),
                 elapsedS = u16(p, 4),
+                distanceM = u16(p, 6),
                 kcal = u16(p, 8) / 10.0,
-                unknown = listOf(6, 10, 12).filter { it + 1 < p.size }.map { u16(p, it) },
+                unknown = listOf(10, 12).filter { it + 1 < p.size }.map { u16(p, it) },
             )
             else -> Status(state)
         }

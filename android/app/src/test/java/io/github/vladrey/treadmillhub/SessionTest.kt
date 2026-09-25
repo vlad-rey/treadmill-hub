@@ -33,6 +33,35 @@ class SessionTest {
         assertTrue(mid > walk && mid < run)
     }
 
+    @Test fun treadmillCounterIsUsedForDistanceAndKcalIncludingPauseAndRestart() {
+        val tracker = SessionTracker { 90.0 }
+        var t = 1_000_000L
+        fun feed(v: Double, dist: Int?, kcal: Double?, phase: Phase = Phase.RUNNING) {
+            tracker.onState(TreadmillState(connection = Connection.CONNECTED, phase = phase, speedKmh = v, distanceM = dist, kcal = kcal), t)
+            t += 1_000
+        }
+        feed(5.0, 0, 0.0)
+        repeat(10) { feed(5.0, 10 * (it + 1), 0.1 * (it + 1)) }  // 100 м, 1,0 ккал
+        feed(0.0, 100, 1.0, Phase.PAUSED)                         // пауза: счётчики стоят
+        feed(0.0, 100, 1.0, Phase.PAUSED)
+        feed(5.0, 110, 1.1)
+        feed(0.0, 110, 1.0, Phase.FINISHED)                       // FitShow 1,1 → FTMS 1: не обнуление
+        feed(0.0, 0, 0.0, Phase.IDLE)                             // СТОП: дорожка обнулилась
+        feed(5.0, 10, 0.1)                                        // новый заезд в той же тренировке
+        val s = tracker.current
+        assertEquals(120.0, s.distanceM, 1e-9)
+        assertEquals(1.2, s.kcalTreadmill!!, 1e-9)
+        assertEquals(120.0, s.buckets.sumOf { it.meters }, 1e-9)
+        assertTrue(s.distanceCalcM > 0)
+    }
+
+    @Test fun ftmsZeroDistanceFallsBackToSpeed() {
+        val tracker = SessionTracker { 70.0 }
+        var t = 0L
+        repeat(61) { tracker.onState(TreadmillState(connection = Connection.CONNECTED, phase = Phase.RUNNING, speedKmh = 6.0, distanceM = 0), t); t += 1_000 }
+        assertEquals(100.0, tracker.current.distanceM, 1e-6)
+    }
+
     @Test fun sessionIntegratesDistanceBucketsAndEnds() {
         val tracker = SessionTracker { 70.0 }
         val running = TreadmillState(connection = Connection.CONNECTED, phase = Phase.RUNNING, speedKmh = 6.0, inclinePct = 5.0)
