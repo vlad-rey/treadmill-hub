@@ -99,6 +99,11 @@ dialog select { font: inherit; font-size: 18px; padding: 10px; border-radius: 10
 dialog details { margin: 8px 0; }
 dialog h3 { margin: 14px 2px 4px; font-size: 13px; font-weight: 500; color: var(--muted); }
 .row[data-session] { cursor: pointer; }
+.weightHead { display: flex; align-items: baseline; gap: 10px; }
+.weightHead b { font-size: 32px; }
+.chart .wline { fill: none; stroke: var(--accent); stroke-width: 3; vector-effect: non-scaling-stroke; }
+.chart .wdot { fill: var(--accent); }
+a.linkbtn { display: grid; place-items: center; text-decoration: none; color: var(--text); font-size: 16px; font-weight: 600; text-align: center; }
 @media (min-width: 900px) { .hubGrid { grid-template-columns: repeat(4, 1fr); } }
 
 .pill.profile { border: 0; color: var(--text); background: #16283a; font-weight: 600; }

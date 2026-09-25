@@ -66,6 +66,34 @@ class ProfileStore(private val file: File) {
     }
 }
 
+// --- История веса -----------------------------------------------------------------------
+
+@Serializable
+data class WeightEntry(val profileId: String, val atMs: Long, val kg: Double)
+
+@Serializable
+data class WeightInput(val kg: Double)
+
+/** Записи веса по профилям. Последняя запись = текущий вес профиля (по нему считаются калории). */
+class WeightStore(private val file: File) {
+    private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
+    private var entries: List<WeightEntry> =
+        runCatching { json.decodeFromString<List<WeightEntry>>(file.readText()) }.getOrDefault(emptyList())
+
+    @Synchronized fun of(profileId: String): List<WeightEntry> = entries.filter { it.profileId == profileId }.sortedBy { it.atMs }
+
+    @Synchronized
+    fun add(profileId: String, kg: Double, atMs: Long = System.currentTimeMillis()): WeightEntry {
+        require(kg in 30.0..250.0) { "вес 30–250 кг" }
+        val e = WeightEntry(profileId, atMs, kg)
+        entries = entries + e
+        val tmp = File(file.parentFile, file.name + ".tmp")
+        tmp.writeText(json.encodeToString(entries))
+        tmp.renameTo(file)
+        return e
+    }
+}
+
 @Serializable
 data class Totals(
     val sessions: Int = 0,

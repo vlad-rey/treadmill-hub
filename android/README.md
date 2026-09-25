@@ -27,6 +27,9 @@ powershell -ExecutionPolicy Bypass -File tools\deploy-hub.ps1 -Serial <IP>:5555
 | GET/POST | `/api/config` | `deviceAddress`, `backend` (`ftms`/`sim`), `weightKg`, `maxSpeedKmh` (по умолчанию 12) |
 | WS | `/ws/debug/ble` | сырые BLE-пакеты в hex (для агентов) |
 | GET/POST | `/api/profiles`, `/api/profiles/{id}` | профили: имя, вес, лимит скорости |
+| GET/POST | `/api/profiles/{id}/weights` | история веса; POST `{kg}` — новая запись и новый текущий вес профиля |
+| GET | `/api/export/sessions.csv?profile=ID`, `/api/sessions/{id}/export?format=tcx\|csv` | экспорт: таблица тренировок; TCX для Strava/Garmin; посекундный CSV |
+| POST | `/api/hub/backup` | отметка скрипта бэкапа на PC |
 | GET | `/api/stats?profile=ID` | итоги: сегодня / неделя / месяц / всё время |
 | GET | `/api/sessions?profile=ID`, `/api/sessions/{id}` | история (пустой `profile=` — без владельца) |
 | POST | `/api/sessions/{id}/profile`, `/api/sessions/{id}/console` | переназначить владельца; показания пульта для сверки |

@@ -14,6 +14,8 @@ data class Sample(
     val kcalTreadmill: Double? = null,
     val heartRate: Int? = null,
     val vendorRaw: List<Int>? = null,
+    /** Показание счётчика дистанции дорожки, м (для сверки с расчётом по скорости). */
+    val distanceTreadmillM: Int? = null,
 )
 
 /** Что показал пульт дорожки в конце — вносится вручную, для калибровки. */

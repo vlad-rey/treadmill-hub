@@ -14,6 +14,7 @@ import io.github.vladrey.treadmillhub.program.capSpeed
 import io.github.vladrey.treadmillhub.session.HistoryStore
 import io.github.vladrey.treadmillhub.session.ProfileStore
 import io.github.vladrey.treadmillhub.session.StatsCalculator
+import io.github.vladrey.treadmillhub.session.WeightStore
 import io.github.vladrey.treadmillhub.session.Sample
 import io.github.vladrey.treadmillhub.session.SavedSession
 import io.github.vladrey.treadmillhub.session.SessionStats
@@ -85,6 +86,7 @@ class Hub(private val context: Context, val config: HubConfig) {
         if (config.backend == "sim") SimulatorBackend { Limits.MAX_SPEED_KMH } else FtmsBleBackend(context, config)
 
     val profiles = ProfileStore(File(context.filesDir, "profiles.json"))
+    val weights = WeightStore(File(context.filesDir, "weights.json"))
     val builtin = BuiltinPrograms(context.assets.open("programs-t12b.json").bufferedReader().use { it.readText() })
     val programs = ProgramStore(File(context.filesDir, "programs.json"))
     @Volatile private var runner: ProgramRunner? = null
@@ -149,7 +151,7 @@ class Hub(private val context: Context, val config: HubConfig) {
                 nextOwner = null
             }
             if (now - lastSampleMs >= 900) {
-                samples += Sample(now - (session.startedAtMs ?: now), s.speedKmh, s.inclinePct, s.kcal, s.heartRate, s.vendorRaw)
+                samples += Sample(now - (session.startedAtMs ?: now), s.speedKmh, s.inclinePct, s.kcal, s.heartRate, s.vendorRaw, s.distanceM)
                 lastSampleMs = now
             }
             if (now - lastSaveMs >= 60_000) { save(session); lastSaveMs = now }

@@ -7,7 +7,7 @@ function showTab(name) {
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("hidden", t.id !== "tab-" + name));
   if (name === "programs") loadPrograms();
-  if (name === "history") loadHistory();
+  if (name === "history") { loadHistory(); loadWeights(); }
   if (name === "hub" && lastSnap) window.renderHub(lastSnap);
   window.scrollTo(0, 0);
 }
@@ -241,6 +241,8 @@ async function loadHistory() {
     fetch("/api/sessions?profile=" + encodeURIComponent(me.id)).then((r) => r.json()),
     fetch("/api/sessions?profile=").then((r) => r.json()),
   ]);
+  $("exportAll").href = "/api/export/sessions.csv?profile=" + encodeURIComponent(me.id);
+  $("exportAll").classList.toggle("hidden", !mine.length);
   $("historyList").innerHTML = mine.length ? mine.slice(0, 100).map((s) => sessionRow(s, false)).join("") : '<p class="muted">Тренировок пока нет.</p>';
   $("orphansTitle").classList.toggle("hidden", !orphans.length);
   $("orphanList").innerHTML = orphans.slice(0, 30).map((s) => sessionRow(s, true)).join("");
@@ -368,6 +370,8 @@ async function openSession(id) {
   $("sdOwner").innerHTML = profiles.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("") +
     `<option value="">Без владельца (запуск с пульта)</option>`;
   $("sdOwner").value = s.profileId || "";
+  $("sdTcx").href = `/api/sessions/${s.id}/export?format=tcx`;
+  $("sdCsv").href = `/api/sessions/${s.id}/export?format=csv`;
   $("sessionDlg").showModal();
 }
 
@@ -388,7 +392,67 @@ $("sdDelete").onclick = async () => {
   loadStats();
 };
 
+// --- Вес: история, график, еженедельный вопрос --------------------------------------------
+const WEEK = 7 * 86400e3;
+let weights = [];
+
+async function loadWeights() {
+  if (!me) return;
+  weights = await (await fetch(`/api/profiles/${encodeURIComponent(me.id)}/weights`)).json();
+  const last = weights[weights.length - 1];
+  $("wNow").textContent = last ? `${last.kg} кг` : "—";
+  const signed = (d) => (d > 0 ? "+" : d < 0 ? "−" : "±") + Math.abs(d).toFixed(1);
+  const monthAgo = [...weights].reverse().find((w) => w.atMs <= Date.now() - 30 * 86400e3);
+  const parts = [];
+  if (last && monthAgo) parts.push(`${signed(last.kg - monthAgo.kg)} кг за месяц`);
+  if (last && weights.length > 1) parts.push(`${signed(last.kg - weights[0].kg)} кг с ${clock(weights[0].atMs).split(",")[0]}`);
+  $("wDelta").textContent = parts.join(" · ") || (last ? `записан ${clock(last.atMs)}` : "");
+  drawWeights();
+}
+
+function drawWeights() {
+  const svg = $("wChart");
+  if (weights.length < 2) { svg.innerHTML = ""; return; }
+  const W = 1000, H = 120, t0 = weights[0].atMs, t1 = weights[weights.length - 1].atMs || t0 + 1;
+  const kgs = weights.map((w) => w.kg), lo = Math.min(...kgs) - 0.5, hi = Math.max(...kgs) + 0.5;
+  const pt = (w) => [((w.atMs - t0) / Math.max(1, t1 - t0)) * (W - 20) + 10, H - 10 - ((w.kg - lo) / (hi - lo)) * (H - 20)];
+  svg.innerHTML = `<path class="wline" d="${weights.map((w, i) => (i ? "L" : "M") + pt(w).join(",")).join(" ")}"/>` +
+    weights.map((w) => { const [x, y] = pt(w); return `<circle class="wdot" cx="${x}" cy="${y}" r="5"/>`; }).join("");
+}
+
+function openWeight(weekly) {
+  const last = weights[weights.length - 1];
+  $("wdText").textContent = weekly && last ? `Прошла неделя с последней записи (${clock(last.atMs)}: ${last.kg} кг). Вес изменился?` : "";
+  $("wdKg").value = last ? last.kg : me ? me.weightKg : "";
+  $("wdSame").classList.toggle("hidden", !weekly);
+  $("wdLater").classList.toggle("hidden", !weekly);
+  $("weightDlg").showModal();
+}
+
+async function saveWeight(kg) {
+  const r = await fetch(`/api/profiles/${encodeURIComponent(me.id)}/weights`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kg }),
+  });
+  if (!r.ok) { toast((await r.json()).error || "не сохранено"); return; }
+  $("weightDlg").close();
+  await loadProfiles(); // вес профиля обновился — по нему считаются калории
+}
+
+$("wAdd").onclick = () => openWeight(false);
+$("wdSave").onclick = () => { const kg = Number($("wdKg").value); if (kg) saveWeight(kg); };
+$("wdSame").onclick = () => { const last = weights[weights.length - 1]; saveWeight(last ? last.kg : me.weightKg); };
+$("wdLater").onclick = () => { try { localStorage.setItem("weightSnooze:" + me.id, Date.now() + 86400e3); } catch (_) {} };
+
+async function weeklyWeightCheck() {
+  await loadWeights();
+  const last = weights[weights.length - 1];
+  let snooze = 0;
+  try { snooze = Number(localStorage.getItem("weightSnooze:" + me.id)) || 0; } catch (_) {}
+  if (last && Date.now() - last.atMs > WEEK && Date.now() > snooze && !document.querySelector("dialog[open]")) openWeight(true);
+}
+
 window.onProfileChanged = () => {
+  if (me) weeklyWeightCheck();
   const active = document.querySelector(".tabs button.active");
   if (active && active.dataset.tab !== "workout") showTab(active.dataset.tab);
 };

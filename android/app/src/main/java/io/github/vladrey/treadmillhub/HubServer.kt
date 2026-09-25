@@ -6,6 +6,8 @@ import io.ktor.http.HttpStatusCode
 import io.github.vladrey.treadmillhub.program.CustomProgramInput
 import io.github.vladrey.treadmillhub.program.ProgramInfo
 import io.github.vladrey.treadmillhub.session.ConsoleReading
+import io.github.vladrey.treadmillhub.session.Export
+import io.github.vladrey.treadmillhub.session.WeightInput
 import io.ktor.server.routing.delete
 import io.github.vladrey.treadmillhub.session.ProfilePatch
 import kotlinx.serialization.Serializable
@@ -60,17 +62,40 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
 
             get("/api/profiles") { call.respondJson(json.encodeToString(hub.profiles.all())) }
             post("/api/profiles") {
-                val r = runCatching { hub.profiles.create(json.decodeFromString<ProfilePatch>(call.receiveText())) }
+                val r = runCatching {
+                    hub.profiles.create(json.decodeFromString<ProfilePatch>(call.receiveText())).also { hub.weights.add(it.id, it.weightKg) }
+                }
                 r.fold({ call.respondJson(json.encodeToString(it)) }, { call.respondError(it) })
             }
             post("/api/profiles/{id}") {
                 val id = call.parameters["id"].orEmpty()
-                val r = runCatching { hub.profiles.update(id, json.decodeFromString<ProfilePatch>(call.receiveText())) }
+                val r = runCatching {
+                    val before = hub.profiles.get(id)?.weightKg
+                    hub.profiles.update(id, json.decodeFromString<ProfilePatch>(call.receiveText()))
+                        ?.also { if (it.weightKg != before) hub.weights.add(id, it.weightKg) }
+                }
                 r.fold(
                     { if (it == null) call.respondJson("""{"error":"профиль не найден"}""", HttpStatusCode.NotFound) else call.respondJson(json.encodeToString(it)) },
                     { call.respondError(it) },
                 )
             }
+            // История веса. У профиля без записей первая запись создаётся из текущего веса.
+            get("/api/profiles/{id}/weights") {
+                val p = hub.profiles.get(call.parameters["id"])
+                if (p == null) { call.respondJson("""{"error":"профиль не найден"}""", HttpStatusCode.NotFound); return@get }
+                if (hub.weights.of(p.id).isEmpty()) hub.weights.add(p.id, p.weightKg)
+                call.respondJson(json.encodeToString(hub.weights.of(p.id)))
+            }
+            post("/api/profiles/{id}/weights") {
+                val id = call.parameters["id"].orEmpty()
+                val r = runCatching {
+                    val kg = json.decodeFromString<WeightInput>(call.receiveText()).kg
+                    requireNotNull(hub.profiles.update(id, ProfilePatch(weightKg = kg))) { "профиль не найден" }
+                    hub.weights.add(id, kg)
+                }
+                r.fold({ call.respondJson(json.encodeToString(it)) }, { call.respondError(it) })
+            }
+
             // Программы: встроенные P1–P8 и свои (свои — общие и профиля)
             get("/api/programs") {
                 val profile = call.request.queryParameters["profile"]
@@ -112,6 +137,21 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
                 val profile = call.request.queryParameters["profile"]
                 val list = hub.history.list().let { all -> if (profile == null) all else all.filter { it.profileId == profile.ifBlank { null } } }
                 call.respondJson(json.encodeToString(list))
+            }
+            // Экспорт: все тренировки профиля одной таблицей; одна тренировка — TCX (Strava/Garmin) или CSV
+            get("/api/export/sessions.csv") {
+                val profile = call.request.queryParameters["profile"]
+                val list = hub.history.list().filter { profile == null || it.profileId == profile.ifBlank { null } }
+                call.respondDownload(Export.summaryCsv(list), "treadmill-sessions.csv", ContentType.Text.CSV)
+            }
+            get("/api/sessions/{id}/export") {
+                val s = call.parameters["id"]?.toLongOrNull()?.let(hub.history::load)
+                if (s == null) { call.respondJson("""{"error":"не найдено"}""", HttpStatusCode.NotFound); return@get }
+                val name = "treadmill-${Export.fileStamp(s.id)}"
+                when (call.request.queryParameters["format"]) {
+                    "csv" -> call.respondDownload(Export.samplesCsv(s), "$name.csv", ContentType.Text.CSV)
+                    else -> call.respondDownload(Export.tcx(s), "$name.tcx", ContentType("application", "vnd.garmin.tcx+xml"))
+                }
             }
             delete("/api/sessions/{id}") {
                 val ok = call.parameters["id"]?.toLongOrNull()?.let(hub.history::delete) == true
@@ -162,6 +202,13 @@ class HubServer(private val hub: Hub, private val assets: AssetManager, port: In
 
     private suspend fun io.ktor.server.application.ApplicationCall.respondJson(body: String, status: HttpStatusCode = HttpStatusCode.OK) =
         respondText(body, ContentType.Application.Json, status)
+
+    private suspend fun io.ktor.server.application.ApplicationCall.respondDownload(body: String, fileName: String, type: ContentType) {
+        response.headers.append("Content-Disposition", "attachment; filename=\"$fileName\"")
+        // BOM — чтобы Excel открыл CSV в UTF-8 без кракозябр
+        val bytes = (if (type == ContentType.Text.CSV) "﻿" + body else body).toByteArray(Charsets.UTF_8)
+        respondBytes(bytes, type.withParameter("charset", "utf-8"))
+    }
 
     private suspend fun io.ktor.server.application.ApplicationCall.respondError(e: Throwable) =
         respondJson("""{"error":${json.encodeToString(e.message ?: "ошибка")}}""", HttpStatusCode.BadRequest)

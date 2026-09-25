@@ -93,8 +93,15 @@
 
     <!-- ИСТОРИЯ -->
     <section id="tab-history" class="tab hidden">
+      <h3>Вес</h3>
+      <div class="stat weightCard">
+        <div class="weightHead"><b id="wNow">—</b><small id="wDelta"></small></div>
+        <svg id="wChart" class="chart" viewBox="0 0 1000 120" preserveAspectRatio="none"></svg>
+        <button type="button" class="btn wide" id="wAdd">Записать вес</button>
+      </div>
       <h3>Мои тренировки</h3>
       <div id="historyList" class="list"></div>
+      <a id="exportAll" class="btn wide linkbtn" download>Все мои тренировки в CSV</a>
       <h3 id="orphansTitle" class="hidden">Без владельца (запуск с пульта)</h3>
       <div id="orphanList" class="list"></div>
     </section>
@@ -146,6 +153,20 @@
     </form>
   </dialog>
 
+  <!-- Вес: запись и еженедельный вопрос -->
+  <dialog id="weightDlg">
+    <form method="dialog">
+      <h2>Вес</h2>
+      <p class="muted" id="wdText"></p>
+      <label>Вес, кг <input id="wdKg" type="number" min="30" max="250" step="0.1" inputmode="decimal"></label>
+      <div class="grid2">
+        <button type="button" class="btn" id="wdSame">Не изменился</button>
+        <button type="button" class="btn go" id="wdSave">Записать</button>
+      </div>
+      <button class="btn wide" value="later" id="wdLater">Спросить завтра</button>
+    </form>
+  </dialog>
+
   <!-- Подробности тренировки -->
   <dialog id="sessionDlg" class="wideDlg">
     <form method="dialog">
@@ -157,6 +178,10 @@
         <summary class="muted">Дистанция по скорости и наклону</summary>
         <table><thead><tr><th>км/ч</th><th>%</th><th>время</th><th>м</th></tr></thead><tbody id="sdBuckets"></tbody></table>
       </details>
+      <div class="grid2">
+        <a id="sdTcx" class="btn linkbtn" download>TCX — Strava, Garmin</a>
+        <a id="sdCsv" class="btn linkbtn" download>CSV — посекундно</a>
+      </div>
       <label>Чья тренировка <select id="sdOwner"></select></label>
       <div class="grid2">
         <button type="button" class="btn" id="sdDelete">Удалить</button>
